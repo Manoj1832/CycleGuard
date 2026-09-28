@@ -372,14 +372,14 @@ async function triggerBiometricVerification() {
         const authStatus = await API.getAuthStatus().catch(() => ({ hasPasskeys: false }));
 
         if (!authStatus.hasPasskeys) {
-          // First time on this device: prompt native Face ID / Touch ID registration
-          console.log('[WebAuthn] First time on device, creating passkey...');
-          await WebAuthn.registerPasskey();
-          setState({ hasPasskeys: true });
-          result = await WebAuthn.authenticatePasskey(currentAction);
-        } else {
-          result = await WebAuthn.authenticatePasskey(currentAction);
+          // Finding F3: If no passkeys are enrolled yet, require PIN authentication first
+          console.log('[WebAuthn] No passkeys registered. Switching to PIN for identity verification.');
+          isVerifying = false;
+          switchView('PIN_REQUIRED');
+          return;
         }
+
+        result = await WebAuthn.authenticatePasskey(currentAction);
       } catch (webAuthnErr) {
         console.warn('[WebAuthn] Biometric error:', webAuthnErr);
         isVerifying = false;

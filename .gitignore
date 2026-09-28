@@ -29,3 +29,7 @@ coverage/
 
 #python
 __pycache__
+
+# Persistent storage files
+backend/data/
+*.json.bak

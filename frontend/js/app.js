@@ -58,6 +58,13 @@ function initDevPanel() {
   const panel = document.getElementById('dev-panel');
   if (!panel) return;
 
+  // Finding F8: Only enable dev panel in local development; strip from production
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocal) {
+    panel.remove();
+    return;
+  }
+
   // Toggle dev panel visibility
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {

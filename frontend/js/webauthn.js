@@ -63,14 +63,16 @@ export function bufferToBase64URL(buffer) {
 
 /**
  * Perform Passkey Registration.
+ * Finding F3: Requires authToken (obtained by entering PIN) or setupToken.
+ * @param {string|null} authToken
  */
-export async function registerPasskey() {
+export async function registerPasskey(authToken = null) {
   if (!isWebAuthnSupported()) {
     throw new Error('WebAuthn is not supported in this browser.');
   }
 
   // 1. Fetch registration options from backend
-  const options = await API.getWebAuthnRegOptions();
+  const options = await API.getWebAuthnRegOptions(authToken);
 
   // 2. Decode binary fields for navigator.credentials.create
   const publicKey = {
@@ -102,7 +104,7 @@ export async function registerPasskey() {
   };
 
   // 5. Verify on backend
-  return await API.verifyWebAuthnReg(credentialJSON);
+  return await API.verifyWebAuthnReg(credentialJSON, authToken);
 }
 
 /**

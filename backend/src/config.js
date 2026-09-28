@@ -14,7 +14,7 @@ const config = {
     port: parseInt(process.env.MQTT_PORT, 10) || 8883,
     username: process.env.MQTT_USERNAME || 'cycleguard',
     password: process.env.MQTT_PASSWORD || '',
-    clientId: `cycleguard-backend-${Date.now()}`,
+    clientId: process.env.MQTT_CLIENT_ID || 'cycleguard-backend-primary',
     reconnectPeriod: 5000,
     connectTimeout: 30000,
   },
@@ -25,8 +25,10 @@ const config = {
       : ['http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:8080'],
   },
 
-  // Prototype PIN — isolate for future migration to hashed storage
-  defaultPin: process.env.DEFAULT_PIN || '1234',
+  // PIN & Setup Security — Finding F3 & F4
+  pinHash: process.env.PIN_HASH || null,
+  defaultPin: process.env.DEFAULT_PIN || null,
+  setupToken: process.env.SETUP_TOKEN || null,
 
   // Authentication & WebAuthn
   auth: {

@@ -1,6 +1,7 @@
 /**
  * CycleGuard Backend — WebSocket Server
  * Broadcasts device state changes to connected frontend clients.
+ * Finding F8: Origin verification, fresh-only movement broadcasts, and explicit alarm active/inactive broadcasts.
  */
 
 const { WebSocketServer } = require('ws');
@@ -8,6 +9,7 @@ const stateManager = require('./stateManager');
 const config = require('./config');
 
 let wss = null;
+let lastMovementBroadcastTimestamp = null;
 
 /**
  * Initialize WebSocket server on existing HTTP server.
@@ -17,6 +19,25 @@ function initWebSocket(server) {
   wss = new WebSocketServer({
     server,
     path: '/ws',
+    verifyClient: (info, callback) => {
+      // Finding F8: Verify origin in production
+      const origin = info.origin || info.req.headers.origin;
+
+      if (!origin || config.nodeEnv !== 'production') {
+        return callback(true);
+      }
+
+      const allowed = config.cors.origins.some((allowedOrigin) => {
+        return origin === allowedOrigin || origin.endsWith(allowedOrigin.replace(/^https?:\/\//, ''));
+      });
+
+      if (allowed) {
+        return callback(true);
+      }
+
+      console.warn(`[WS] Rejected connection from unauthorized origin: ${origin}`);
+      return callback(false, 403, 'Unauthorized Origin');
+    },
   });
 
   console.log('[WS] WebSocket server initialized on /ws');
@@ -40,11 +61,17 @@ function initWebSocket(server) {
       status: deviceState.connectionState === 'CONNECTED' ? 'ONLINE' : 'OFFLINE',
     });
 
+    sendToClient(ws, {
+      type: 'alarm',
+      deviceId: deviceState.deviceId,
+      active: !!deviceState.alarmActive,
+      timestamp: new Date().toISOString(),
+    });
+
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message);
         console.log('[WS] Received from client:', data);
-        // Future: handle client commands over WebSocket
       } catch (err) {
         console.error('[WS] Invalid message from client');
       }
@@ -67,6 +94,7 @@ function initWebSocket(server) {
 
 /**
  * Broadcast device state change to all connected clients.
+ * Finding F8: Only broadcast movement if timestamp is fresh; broadcast alarm active: false on clear.
  */
 function broadcastDeviceState(deviceId, deviceState) {
   if (!wss) return;
@@ -79,18 +107,17 @@ function broadcastDeviceState(deviceId, deviceState) {
     timestamp: new Date().toISOString(),
   });
 
-  // Send alarm state if active
-  if (deviceState.alarmActive) {
-    broadcast({
-      type: 'alarm',
-      deviceId,
-      active: true,
-      timestamp: new Date().toISOString(),
-    });
-  }
+  // Finding F8: Always broadcast current alarm state (active or cleared)
+  broadcast({
+    type: 'alarm',
+    deviceId,
+    active: !!deviceState.alarmActive,
+    timestamp: new Date().toISOString(),
+  });
 
-  // Send movement info if available
-  if (deviceState.lastActivity) {
+  // Finding F8: Broadcast movement info ONLY if this is a new movement event
+  if (deviceState.lastActivity && deviceState.lastActivity.timestamp !== lastMovementBroadcastTimestamp) {
+    lastMovementBroadcastTimestamp = deviceState.lastActivity.timestamp;
     broadcast({
       type: 'movement_detected',
       deviceId,

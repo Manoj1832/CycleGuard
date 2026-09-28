@@ -70,16 +70,19 @@ export function verifyPin(pin, action = null) {
 
 /**
  * Get WebAuthn registration options.
+ * Finding F3: Requires authToken (from PIN) or SETUP_TOKEN.
  */
-export function getWebAuthnRegOptions() {
-  return request('POST', '/api/auth/webauthn/register/options');
+export function getWebAuthnRegOptions(authToken = null) {
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  return request('POST', '/api/auth/webauthn/register/options', { authToken }, headers);
 }
 
 /**
  * Verify WebAuthn registration response.
  */
-export function verifyWebAuthnReg(body) {
-  return request('POST', '/api/auth/webauthn/register/verify', body);
+export function verifyWebAuthnReg(body, authToken = null) {
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  return request('POST', '/api/auth/webauthn/register/verify', { ...body, authToken }, headers);
 }
 
 /**

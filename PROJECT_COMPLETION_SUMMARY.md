@@ -171,3 +171,19 @@ When ready to connect the physical hardware to your bicycle:
    * Connect ESP32-C3 via USB and upload using PlatformIO or Arduino IDE.
 4. **Operation**:
    * ESP32 will connect to EMQX Cloud over TLS. Any command sent from your phone via [https://cycleguard-3jlr.onrender.com/](https://cycleguard-3jlr.onrender.com/) will instantly arm or disarm the bike.
+
+---
+
+## 6. Security & Reliability Hardening Matrix (Audit Fixes)
+
+| Finding | Severity | Description | Fix Implemented |
+|---|---|---|---|
+| **F1** | Critical | ARM claimed success when MQTT link was down | `/arm`, `/disarm`, and `/alarm/clear` check `isMqttConnected()` and `publishCommand()` returning 503 if broker is down. Transitions to a pending state awaiting confirmation from ESP32. |
+| **F2** | Critical | Mock biometric endpoint `/api/auth/mock/verify` bypass | Gated with `!config.auth.mockMode || config.nodeEnv === 'production'` to return 404 in production. |
+| **F3** | Critical | Passkey registration open to anyone; RAM wipes | Required PIN-verified `authToken` or `SETUP_TOKEN` for registration; persisted credentials to disk (`data/credentials.json`). |
+| **F4** | High | Plaintext PIN in repository and timing vulnerability | Removed hardcoded PIN from `frontend/js/config.js`; implemented constant-time comparison `crypto.timingSafeEqual` with `scrypt` hash (`PIN_HASH`). |
+| **F5** | High | Shared lockout across users behind Render proxy | Added `app.set('trust proxy', 1)` so Express reads real client IP from reverse proxy headers. |
+| **F6** | High | State lost on Render service sleep/restart | Implemented disk persistence for device states (`data/state.json`) and passkeys (`data/credentials.json`). |
+| **F7** | Medium | MQTT contract discrepancies | Synchronized JSON command contract `{"command":"ARM","timestamp":"..."}`; handled `alarmActive` boolean from device status message. |
+| **F8** | Medium | CORS reflection, WebSocket origin leaks & alert replay | Restricted CORS in production; validated WebSocket origin; deduplicated movement alerts by timestamp; stripped Dev Panel from production DOM. |
+

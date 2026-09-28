@@ -9,10 +9,13 @@ const { getClientCount } = require('../websocket');
 const router = express.Router();
 
 router.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
+  const mqttConnected = isMqttConnected();
+  const statusCode = mqttConnected ? 200 : 503;
+
+  res.status(statusCode).json({
+    status: mqttConnected ? 'ok' : 'degraded',
     service: 'cycleguard-backend',
-    mqtt: isMqttConnected(),
+    mqtt: mqttConnected,
     websocketClients: getClientCount(),
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),

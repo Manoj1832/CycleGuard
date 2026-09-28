@@ -10,6 +10,8 @@ const {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
+const fs = require('fs');
+const path = require('path');
 const config = require('./config');
 
 // ---- Rate Limiting & Lockout ----
@@ -31,16 +33,61 @@ setInterval(() => {
   }
 }, 30000);
 
-// ---- WebAuthn Store ----
-// For production, persist to PostgreSQL/MongoDB.
+// ---- WebAuthn Store & Disk Persistence (Finding F3 & F6) ----
+const DATA_DIR = path.join(__dirname, '../data');
+const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
+
 const DEFAULT_USER = {
   id: 'cycleguard-owner-001',
   username: 'owner@cycleguard.local',
   displayName: 'CycleGuard Owner',
 };
 
-// Map of credentialID -> { id, publicKey, counter, transports, deviceType, backedUp }
+// Map of credentialID -> { id, publicKey, counter, transports, createdAt }
 const userCredentials = new Map();
+
+function loadCredentialsFromDisk() {
+  try {
+    if (fs.existsSync(CREDENTIALS_FILE)) {
+      const raw = fs.readFileSync(CREDENTIALS_FILE, 'utf8');
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        list.forEach((cred) => {
+          if (cred && cred.id) {
+            // Restore binary publicKey Buffer if serialized
+            if (cred.publicKey && typeof cred.publicKey === 'object' && cred.publicKey.type === 'Buffer') {
+              cred.publicKey = Buffer.from(cred.publicKey.data);
+            } else if (typeof cred.publicKey === 'string') {
+              cred.publicKey = Buffer.from(cred.publicKey, 'base64');
+            }
+            userCredentials.set(cred.id, cred);
+          }
+        });
+        console.log(`[WebAuthn] Restored ${userCredentials.size} passkeys from disk store.`);
+      }
+    }
+  } catch (err) {
+    console.error('[WebAuthn] Error restoring credentials from disk:', err.message);
+  }
+}
+
+function saveCredentialsToDisk() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const list = Array.from(userCredentials.values()).map((cred) => ({
+      ...cred,
+      publicKey: Buffer.isBuffer(cred.publicKey) ? cred.publicKey.toString('base64') : cred.publicKey,
+    }));
+    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[WebAuthn] Error saving credentials to disk:', err.message);
+  }
+}
+
+// Load credentials on startup
+loadCredentialsFromDisk();
 
 // Map of clientId -> { challenge: string, expiresAt: number }
 const activeChallenges = new Map();
@@ -130,6 +177,42 @@ function verifyAndConsumeAuthToken(token, expectedAction = null) {
 }
 
 /**
+ * Timing-safe PIN verification supporting scrypt PIN_HASH and constant-time fallback.
+ * Finding F4: Prevents timing attacks and supports salted hash storage.
+ * @param {string} inputPin
+ * @returns {boolean}
+ */
+function pinMatches(inputPin) {
+  if (!inputPin || typeof inputPin !== 'string') return false;
+
+  // 1. Salted scrypt hash mode: PIN_HASH="<saltHex>:<hashHex>"
+  if (config.pinHash && config.pinHash.includes(':')) {
+    try {
+      const [saltHex, hashHex] = config.pinHash.split(':');
+      const salt = Buffer.from(saltHex, 'hex');
+      const expected = Buffer.from(hashHex, 'hex');
+      const derived = crypto.scryptSync(inputPin, salt, expected.length);
+      return crypto.timingSafeEqual(derived, expected);
+    } catch (err) {
+      console.error('[Auth] Error verifying PIN hash:', err.message);
+      return false;
+    }
+  }
+
+  // 2. Constant-time fallback with configured PIN (default: 2873)
+  const targetPin = config.defaultPin || '2873';
+  const targetBuf = Buffer.from(targetPin, 'utf8');
+  const inputBuf = Buffer.from(inputPin, 'utf8');
+
+  if (targetBuf.length !== inputBuf.length) {
+    crypto.timingSafeEqual(targetBuf, targetBuf);
+    return false;
+  }
+
+  return crypto.timingSafeEqual(inputBuf, targetBuf);
+}
+
+/**
  * Verify a 4-digit PIN.
  * @param {string} pin
  * @param {string} clientId
@@ -150,18 +233,18 @@ function verifyPin(pin, clientId = 'default', action = null) {
   }
 
   // Validate format
-  if (!pin || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
+  if (!pin || typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
     return {
       success: false,
-      error: 'Invalid PIN format. Must be 4 digits.',
+      error: 'Invalid PIN format. Must be numeric.',
       lockedOut: false,
       remainingSeconds: 0,
       attemptsRemaining: status.attemptsRemaining,
     };
   }
 
-  // Check correct PIN
-  if (pin === config.defaultPin) {
+  // Check correct PIN using timing-safe comparison
+  if (pinMatches(pin)) {
     resetLockout(clientId);
     const authToken = createAuthToken(clientId, action);
     return {
@@ -274,6 +357,9 @@ async function verifyRegistration(body, clientId = 'default', origin = null, dyn
         createdAt: new Date().toISOString(),
       });
 
+      // Finding F3 & F6: Persist credentials to disk immediately
+      saveCredentialsToDisk();
+
       activeChallenges.delete(clientId);
       return { verified: true };
     }
@@ -349,9 +435,10 @@ async function verifyAuthentication(body, clientId = 'default', action = null, o
     });
 
     if (verification.verified) {
-      // Update credential counter
+      // Update credential counter and persist
       credential.counter = verification.authenticationInfo.newCounter;
       userCredentials.set(credential.id, credential);
+      saveCredentialsToDisk();
 
       // Successful auth resets lockout
       resetLockout(clientId);

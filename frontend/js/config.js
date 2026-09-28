@@ -23,9 +23,6 @@ const CONFIG = {
   // ---- Device ----
   DEVICE_ID: '001',
 
-  // ---- PIN (prototype only — move to backend for production) ----
-  DEFAULT_PIN: '2873',
-
   // ---- Reconnection ----
   WS_RECONNECT_DELAY: 3000,    // ms
   WS_MAX_RECONNECT_DELAY: 30000, // ms

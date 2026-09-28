@@ -92,20 +92,31 @@ function handleMqttMessage(topic, payload) {
 
   // Match topic pattern
   if (topic.endsWith('/status')) {
-    // Device status update
+    const updates = {};
+
     if (payload.securityState) {
-      stateManager.updateDevice(deviceId, {
-        securityState: payload.securityState,
-      });
+      updates.securityState = payload.securityState;
+      // Finding F1: Clear pending action when confirmed by physical device
+      stateManager.checkAndClearPending(deviceId, payload.securityState);
     }
-    if (payload.status === 'ONLINE') {
+
+    if (typeof payload.alarmActive === 'boolean') {
+      updates.alarmActive = payload.alarmActive;
+    }
+
+    // Finding F7 & F8: Any status message from device confirms it is connected
+    if (payload.status === 'ONLINE' || payload.securityState) {
       stateManager.setConnectionState(deviceId, 'CONNECTED');
     } else if (payload.status === 'OFFLINE') {
       stateManager.setConnectionState(deviceId, 'DISCONNECTED');
     }
+
+    if (Object.keys(updates).length > 0) {
+      stateManager.updateDevice(deviceId, updates);
+    }
   } else if (topic.endsWith('/alert')) {
     // Alert from device
-    if (payload.event === 'MOVEMENT_DETECTED' || payload.type === 'MOVEMENT_DETECTED') {
+    if (payload.event === 'MOVEMENT_DETECTED' || payload.type === 'MOVEMENT_DETECTED' || payload.event === 'MOVEMENT') {
       stateManager.recordMovement(deviceId, payload.timestamp);
     }
     if (payload.event === 'ALARM_ACTIVE') {

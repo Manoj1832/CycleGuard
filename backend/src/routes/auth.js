@@ -57,10 +57,43 @@ router.post('/pin/verify', (req, res) => {
 });
 
 /**
+ * Helper to check authorization for passkey registration.
+ * Finding F3: Requires either a verified PIN authToken or SETUP_TOKEN.
+ */
+function checkRegistrationAuth(req) {
+  const authHeader = req.get('Authorization') || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
+  const tokenCandidate = bearerToken || req.body?.authToken || req.body?.setupToken || req.query?.setupToken;
+
+  // 1. Check SETUP_TOKEN if configured in environment
+  if (config.setupToken && tokenCandidate === config.setupToken) {
+    return { authorized: true };
+  }
+
+  // 2. Check authToken from verified PIN
+  if (tokenCandidate) {
+    const tokenCheck = auth.verifyAndConsumeAuthToken(tokenCandidate);
+    if (tokenCheck.valid) {
+      return { authorized: true };
+    }
+  }
+
+  return {
+    authorized: false,
+    error: 'Passkey registration requires authorization. Enter PIN first or provide SETUP_TOKEN.',
+  };
+}
+
+/**
  * POST /api/auth/webauthn/register/options
- * Generate passkey registration options.
+ * Generate passkey registration options. Requires authorization.
  */
 router.post('/webauthn/register/options', async (req, res) => {
+  const authCheck = checkRegistrationAuth(req);
+  if (!authCheck.authorized) {
+    return res.status(401).json({ success: false, error: authCheck.error });
+  }
+
   const clientId = req.ip;
   const rpId = req.hostname;
   try {
@@ -80,9 +113,11 @@ router.post('/webauthn/register/verify', async (req, res) => {
   const clientId = req.ip;
   const origin = req.get('Origin') || req.get('Referer');
   const rpId = req.hostname;
+  const { credential, response } = req.body;
+  const regPayload = credential || response || req.body;
 
   try {
-    const verification = await auth.verifyRegistration(req.body, clientId, origin, rpId);
+    const verification = await auth.verifyRegistration(regPayload, clientId, origin, rpId);
     if (!verification.verified) {
       return res.status(400).json({ success: false, error: verification.error });
     }
@@ -140,6 +175,11 @@ router.post('/webauthn/login/verify', async (req, res) => {
  * Mock biometric verification for testing environments.
  */
 router.post('/mock/verify', (req, res) => {
+  // Finding F2: Block mock verify in production or when mockMode is disabled
+  if (!config.auth.mockMode || config.nodeEnv === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   const clientId = req.ip;
   const { action, shouldSucceed = true } = req.body;
 

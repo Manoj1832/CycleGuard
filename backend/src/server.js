@@ -20,6 +20,9 @@ const authRoutes = require('./routes/auth');
 // ---- Express App ----
 const app = express();
 
+// Finding F5: Trust Render / reverse proxy so req.ip identifies client, not the proxy
+app.set('trust proxy', 1);
+
 // Security headers (permit WebSockets and fonts)
 app.use(helmet({
   contentSecurityPolicy: {
@@ -34,14 +37,31 @@ app.use(helmet({
   },
 }));
 
-// CORS
+// CORS — Finding F8: Restrict origins in production
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests from mobile devices on local network, localhost, or configured origins
-    callback(null, true);
+    // Allow requests with no origin (e.g. mobile apps, curl, same-origin)
+    if (!origin) return callback(null, true);
+
+    // Development allows localhost / LAN
+    if (config.nodeEnv !== 'production') {
+      return callback(null, true);
+    }
+
+    // Production check against allowed origins
+    const allowed = config.cors.origins.some((allowedOrigin) => {
+      return origin === allowedOrigin || origin.endsWith(allowedOrigin.replace(/^https?:\/\//, ''));
+    });
+
+    if (allowed) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS] Blocked request from origin: ${origin}`);
+    callback(new Error('CORS request rejected: Origin not allowed'));
   },
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Body parsing
