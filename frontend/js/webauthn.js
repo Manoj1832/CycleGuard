@@ -101,6 +101,7 @@ export async function registerPasskey(authToken = null) {
       clientDataJSON: bufferToBase64URL(credential.response.clientDataJSON),
       transports: credential.response.getTransports ? credential.response.getTransports() : [],
     },
+    clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
   };
 
   // 5. Verify on backend
@@ -144,6 +145,7 @@ export async function authenticatePasskey(action = null) {
       signature: bufferToBase64URL(assertion.response.signature),
       userHandle: assertion.response.userHandle ? bufferToBase64URL(assertion.response.userHandle) : null,
     },
+    clientExtensionResults: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
   };
 
   // 5. Verify on backend and receive single-use authToken

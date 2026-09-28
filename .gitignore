@@ -33,3 +33,7 @@ __pycache__
 # Persistent storage files
 backend/data/
 *.json.bak
+
+# Firmware secrets (use firmware/config.example.h as the template)
+firmware/config.h
+

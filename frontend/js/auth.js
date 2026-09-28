@@ -329,6 +329,8 @@ function getActionDescription(action) {
       return 'Use biometric authentication to turn OFF security.';
     case 'ALARM_CLEAR':
       return 'Use biometric authentication to turn OFF active alarm.';
+    case 'REGISTER_PASSKEY':
+      return 'Verify your identity to add a new passkey.';
     default:
       return 'Use biometric authentication to continue.';
   }
@@ -339,6 +341,7 @@ function getActionVerb(action) {
     case 'ARM': return 'turn ON security';
     case 'DISARM': return 'turn OFF security';
     case 'ALARM_CLEAR': return 'turn OFF alarm';
+    case 'REGISTER_PASSKEY': return 'add a passkey';
     default: return 'continue';
   }
 }
@@ -642,6 +645,12 @@ function onAuthSuccess(authToken) {
       els.overlay.classList.remove('success-overlay--visible');
     }
 
+    if (actionToExecute === 'REGISTER_PASSKEY') {
+      // Passkey enrolment is not an ARM/DISARM command: use the token to register.
+      registerPasskeyWithToken(authToken);
+      return;
+    }
+
     // Execute security command with single-use authToken
     executeSecurityCommand(actionToExecute, authToken);
   }, CONFIG.SUCCESS_DISPLAY_TIME);
@@ -754,12 +763,20 @@ function showTemporaryToast(message) {
 // ==============================================================
 
 /**
- * Register a new passkey from UI.
+ * Start passkey enrolment. The backend requires proof of identity first
+ * (PIN, or an existing passkey), so route through the normal auth sheet.
  */
-export async function handleRegisterPasskey() {
+export function handleRegisterPasskey() {
+  openAuthSheet('REGISTER_PASSKEY');
+}
+
+/**
+ * Finish enrolment once the auth sheet has produced a single-use token.
+ */
+async function registerPasskeyWithToken(authToken) {
   try {
     showTemporaryToast('Registering passkey...');
-    await WebAuthn.registerPasskey();
+    await WebAuthn.registerPasskey(authToken);
     setState({ hasPasskeys: true });
     showTemporaryToast('Passkey registered successfully!');
   } catch (err) {

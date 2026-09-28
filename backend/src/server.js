@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const config = require('./config');
 const { connectMqtt, disconnectMqtt } = require('./mqtt');
 const { initWebSocket } = require('./websocket');
+const { isOriginAllowed } = require('./origin');
 
 // Routes
 const healthRoutes = require('./routes/health');
@@ -37,35 +38,35 @@ app.use(helmet({
   },
 }));
 
-// CORS — Finding F8: Restrict origins in production
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, curl, same-origin)
-    if (!origin) return callback(null, true);
+// CORS — Finding RC1: Per-request delegate so we can compare Origin against this request's Host
+app.use(cors((req, callback) => {
+  const origin = req.headers.origin;
+  const options = { methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] };
 
-    // Development allows localhost / LAN
-    if (config.nodeEnv !== 'production') {
-      return callback(null, true);
-    }
+  // Development allows localhost / LAN, production checks exact origin match or same-origin
+  if (config.nodeEnv !== 'production' || isOriginAllowed(origin, req.headers.host, config.cors.origins)) {
+    return callback(null, { ...options, origin: true });
+  }
 
-    // Production check against allowed origins
-    const allowed = config.cors.origins.some((allowedOrigin) => {
-      return origin === allowedOrigin || origin.endsWith(allowedOrigin.replace(/^https?:\/\//, ''));
-    });
-
-    if (allowed) {
-      return callback(null, true);
-    }
-
-    console.warn(`[CORS] Blocked request from origin: ${origin}`);
-    callback(new Error('CORS request rejected: Origin not allowed'));
-  },
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // Reject with a clean 403 (not an unhandled-error 500)
+  console.warn(`[CORS] Blocked request from origin: ${origin}`);
+  return callback(null, { ...options, origin: false });
 }));
+
+// Block cross-site writes from unknown origins outright (CORS alone only hides responses)
+app.use((req, res, next) => {
+  if (config.nodeEnv === 'production' && req.method !== 'GET' && req.method !== 'OPTIONS'
+      && !isOriginAllowed(req.headers.origin, req.headers.host, config.cors.origins)) {
+    return res.status(403).json({ error: 'Origin not allowed' });
+  }
+  next();
+});
 
 // Body parsing
 app.use(express.json({ limit: '10kb' }));
+
+// Liveness probe: process is up. (/api/health stays a readiness probe and returns 503 when MQTT is down)
+app.get('/healthz', (req, res) => res.status(200).json({ status: 'alive' }));
 
 // ---- Routes ----
 app.use('/api', healthRoutes);

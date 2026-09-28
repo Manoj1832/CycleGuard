@@ -40,7 +40,7 @@ export function connectWebSocket() {
 
   ws.onopen = () => {
     console.log('[WS] Connected');
-    setState({ connectionState: 'CONNECTED' });
+    // Finding S7: Do not claim the *device* is connected here; the backend sends device_status right after.
     reconnectDelay = CONFIG.WS_RECONNECT_DELAY; // reset backoff
   };
 

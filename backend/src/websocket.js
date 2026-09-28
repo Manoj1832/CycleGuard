@@ -7,6 +7,7 @@
 const { WebSocketServer } = require('ws');
 const stateManager = require('./stateManager');
 const config = require('./config');
+const { isOriginAllowed } = require('./origin');
 
 let wss = null;
 let lastMovementBroadcastTimestamp = null;
@@ -20,18 +21,11 @@ function initWebSocket(server) {
     server,
     path: '/ws',
     verifyClient: (info, callback) => {
-      // Finding F8: Verify origin in production
+      // Finding F8: verify origin in production (same-origin or exact allowlist match)
       const origin = info.origin || info.req.headers.origin;
+      const host = info.req.headers['x-forwarded-host'] || info.req.headers.host;
 
-      if (!origin || config.nodeEnv !== 'production') {
-        return callback(true);
-      }
-
-      const allowed = config.cors.origins.some((allowedOrigin) => {
-        return origin === allowedOrigin || origin.endsWith(allowedOrigin.replace(/^https?:\/\//, ''));
-      });
-
-      if (allowed) {
+      if (config.nodeEnv !== 'production' || isOriginAllowed(origin, host, config.cors.origins)) {
         return callback(true);
       }
 

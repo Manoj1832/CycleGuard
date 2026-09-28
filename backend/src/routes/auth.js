@@ -113,8 +113,11 @@ router.post('/webauthn/register/verify', async (req, res) => {
   const clientId = req.ip;
   const origin = req.get('Origin') || req.get('Referer');
   const rpId = req.hostname;
-  const { credential, response } = req.body;
-  const regPayload = credential || response || req.body;
+
+  // The client sends the credential flat ({ id, rawId, type, response:{...}, authToken }).
+  // Do NOT destructure `response` here: that is the *inner* attestation object, not the credential.
+  const { authToken, setupToken, ...flat } = req.body || {};
+  const regPayload = req.body?.credential || flat;
 
   try {
     const verification = await auth.verifyRegistration(regPayload, clientId, origin, rpId);

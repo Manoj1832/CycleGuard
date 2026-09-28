@@ -8,7 +8,8 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '../data');
+const config = require('./config');
+const DATA_DIR = config.dataDir;
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 
 class StateManager extends EventEmitter {

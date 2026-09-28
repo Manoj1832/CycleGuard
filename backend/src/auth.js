@@ -34,7 +34,7 @@ setInterval(() => {
 }, 30000);
 
 // ---- WebAuthn Store & Disk Persistence (Finding F3 & F6) ----
-const DATA_DIR = path.join(__dirname, '../data');
+const DATA_DIR = config.dataDir;
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 
 const DEFAULT_USER = {
@@ -199,8 +199,10 @@ function pinMatches(inputPin) {
     }
   }
 
-  // 2. Constant-time fallback with configured PIN (default: 2873)
-  const targetPin = config.defaultPin || '2873';
+  // 2. Constant-time comparison against DEFAULT_PIN (dev only). No hardcoded fallback:
+  //    if nothing is configured, every PIN is rejected.
+  if (!config.defaultPin) return false;
+  const targetPin = config.defaultPin;
   const targetBuf = Buffer.from(targetPin, 'utf8');
   const inputBuf = Buffer.from(inputPin, 'utf8');
 

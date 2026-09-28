@@ -42,6 +42,10 @@ const config = {
     mockMode: process.env.AUTH_MOCK_MODE === 'true',
   },
 
+  // Where credentials.json / state.json live. On Render, point this at a persistent
+  // disk mount (e.g. /var/data) or these files vanish on every deploy / spin-down.
+  dataDir: process.env.DATA_DIR || require('path').join(__dirname, '../data'),
+
   // Device
   defaultDeviceId: '001',
 
@@ -53,6 +57,11 @@ const config = {
     test: (deviceId) => `cycleguard/device/${deviceId}/test`,
   },
 };
+
+// Refuse to boot a production server that has no real PIN configured.
+if (config.nodeEnv === 'production' && !config.pinHash && !config.defaultPin) {
+  throw new Error('PIN_HASH (or DEFAULT_PIN) must be set when NODE_ENV=production. Generate one with: node backend/scripts/hashPin.js <pin>');
+}
 
 Object.freeze(config);
 Object.freeze(config.mqtt);

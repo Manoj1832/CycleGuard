@@ -164,7 +164,7 @@ MQTT_PASSWORD=your_mqtt_password
 CORS_ORIGINS=http://localhost:5500,http://127.0.0.1:5500,http://localhost:8080
 
 # Fallback PIN
-DEFAULT_PIN=2873
+DEFAULT_PIN=          # dev only. Production requires PIN_HASH (node backend/scripts/hashPin.js <pin>)
 
 # WebAuthn & Lockout
 RP_NAME=CycleGuard
