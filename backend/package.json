@@ -1,0 +1,27 @@
+{
+  "name": "cycleguard-backend",
+  "version": "1.0.0",
+  "description": "CycleGuard — Smart Bicycle Security Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "iot",
+    "bicycle",
+    "security",
+    "mqtt",
+    "websocket"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "mqtt": "^5.10.4",
+    "ws": "^8.18.1"
+  }
+}

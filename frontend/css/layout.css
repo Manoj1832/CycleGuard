@@ -1,0 +1,136 @@
+/* ==============================================
+   CycleGuard — Layout
+   Mobile-first app shell, header, and main layout
+   ============================================== */
+
+html {
+  font-family: var(--font-family);
+  font-size: 16px;
+  color: var(--text-primary);
+  background-color: var(--gray-200);
+}
+
+body {
+  min-height: 100dvh;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: var(--gray-200);
+}
+
+/* ---- App Shell ---- */
+.app-shell {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  min-height: 100vh;
+  background-color: var(--background);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  box-shadow: var(--shadow-xl);
+}
+
+/* ---- Header ---- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  padding-top: calc(var(--safe-top) + var(--space-4));
+  background-color: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+}
+
+.app-header__brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header__title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.app-header__subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-normal);
+  margin-top: 1px;
+}
+
+.app-header__action {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.app-header__action:hover {
+  background-color: var(--gray-100);
+  color: var(--text-primary);
+}
+
+.app-header__action:active {
+  background-color: var(--gray-200);
+}
+
+.app-header__action svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---- Main Content ---- */
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-4));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Connection Banner ---- */
+.connection-banner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--warning-bg);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-align: center;
+}
+
+.connection-banner--visible {
+  display: flex;
+}
+
+.connection-banner__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--warning);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ---- Footer safe area ---- */
+.app-footer-safe {
+  height: var(--safe-bottom);
+  flex-shrink: 0;
+}

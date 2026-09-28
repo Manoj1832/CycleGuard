@@ -1,0 +1,102 @@
+/* ==============================================
+   CycleGuard — Animations
+   Keyframes and animation utilities
+   ============================================== */
+
+/* ---- Pulse dot (connection indicator) ---- */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ---- Alarm pulse on status ring ---- */
+@keyframes alarm-ring-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(220, 38, 38, 0);
+  }
+}
+
+/* ---- Alarm button pulse ---- */
+@keyframes alarm-btn-pulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+  }
+  50% {
+    box-shadow: 0 2px 16px rgba(220, 38, 38, 0.5);
+  }
+}
+
+/* ---- PIN shake (wrong pin) ---- */
+@keyframes pin-shake {
+  0% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(6px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+.pin-dots--shake {
+  animation: pin-shake 400ms ease-in-out;
+}
+
+/* ---- Success check scale ---- */
+@keyframes scale-in {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* ---- Fade in ---- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Slide up ---- */
+@keyframes slide-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- State transition ---- */
+.state-transition {
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+/* ---- Biometric pulse ---- */
+@keyframes bio-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(37, 99, 235, 0);
+  }
+}
+
+.bio-icon--pulse {
+  animation: bio-pulse 2s ease-in-out infinite;
+}
+
+/* ---- Alarm ring animation class ---- */
+.status-ring--alarm {
+  animation: alarm-ring-pulse 2s ease-in-out infinite;
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .status-ring--alarm,
+  .btn-primary--alarm,
+  .pin-dots--shake,
+  .connection-banner__dot,
+  .info-card__status-dot--connecting {
+    animation: none !important;
+  }
+}

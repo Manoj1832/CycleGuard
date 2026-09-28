@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#f8fafc">
+  <meta name="description" content="CycleGuard — Smart bicycle security and movement detection system. Protect your bicycle with real-time alerts.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>CycleGuard — Smart Bicycle Security</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <!-- ============================================
+       APP SHELL
+       ============================================ -->
+  <div class="app-shell" id="app">
+
+    <!-- Connection Banner -->
+    <div class="connection-banner" id="connection-banner" role="status" aria-live="polite">
+      <span class="connection-banner__dot"></span>
+      <span>Reconnecting...</span>
+    </div>
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-header__brand">
+        <h1 class="app-header__title">CycleGuard</h1>
+        <p class="app-header__subtitle">Your bicycle. Always aware.</p>
+      </div>
+      <button class="app-header__action" id="settings-btn" aria-label="Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-content">
+
+      <!-- Security Status -->
+      <section class="security-section" aria-label="Security Status">
+        <div class="status-ring" id="status-ring">
+          <div class="status-ring__icon" id="status-icon">
+            <!-- Icon injected by JS -->
+          </div>
+          <span class="status-ring__label" id="status-label">Security</span>
+          <span class="status-ring__state" id="status-state">OFF</span>
+        </div>
+        <p class="security-section__description" id="status-description">
+          Your bicycle is not being monitored
+        </p>
+      </section>
+
+      <!-- Bicycle Visual -->
+      <div class="bicycle-visual" id="bicycle-visual" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Rear Wheel -->
+          <circle cx="95" cy="160" r="52" opacity="0.9"/>
+          <circle cx="95" cy="160" r="4" fill="currentColor" stroke="none"/>
+          <!-- Rear Spokes -->
+          <line x1="95" y1="108" x2="95" y2="132" opacity="0.3"/>
+          <line x1="95" y1="188" x2="95" y2="212" opacity="0.3"/>
+          <line x1="43" y1="160" x2="67" y2="160" opacity="0.3"/>
+          <line x1="123" y1="160" x2="147" y2="160" opacity="0.3"/>
+          <line x1="58" y1="123" x2="74" y2="139" opacity="0.3"/>
+          <line x1="116" y1="181" x2="132" y2="197" opacity="0.3"/>
+          <line x1="58" y1="197" x2="74" y2="181" opacity="0.3"/>
+          <line x1="116" y1="139" x2="132" y2="123" opacity="0.3"/>
+          <!-- Front Wheel -->
+          <circle cx="305" cy="160" r="52" opacity="0.9"/>
+          <circle cx="305" cy="160" r="4" fill="currentColor" stroke="none"/>
+          <!-- Front Spokes -->
+          <line x1="305" y1="108" x2="305" y2="132" opacity="0.3"/>
+          <line x1="305" y1="188" x2="305" y2="212" opacity="0.3"/>
+          <line x1="253" y1="160" x2="277" y2="160" opacity="0.3"/>
+          <line x1="333" y1="160" x2="357" y2="160" opacity="0.3"/>
+          <line x1="268" y1="123" x2="284" y2="139" opacity="0.3"/>
+          <line x1="326" y1="181" x2="342" y2="197" opacity="0.3"/>
+          <line x1="268" y1="197" x2="284" y2="181" opacity="0.3"/>
+          <line x1="326" y1="139" x2="342" y2="123" opacity="0.3"/>
+          <!-- Frame -->
+          <!-- Seat tube -->
+          <line x1="175" y1="75" x2="155" y2="160"/>
+          <!-- Top tube -->
+          <line x1="175" y1="75" x2="270" y2="70"/>
+          <!-- Down tube -->
+          <line x1="155" y1="160" x2="270" y2="70"/>
+          <!-- Chain stays -->
+          <line x1="155" y1="160" x2="95" y2="160"/>
+          <!-- Seat stays -->
+          <line x1="175" y1="75" x2="95" y2="160"/>
+          <!-- Fork -->
+          <line x1="270" y1="70" x2="305" y2="160"/>
+          <!-- Seat post -->
+          <line x1="175" y1="75" x2="172" y2="55"/>
+          <!-- Seat -->
+          <path d="M158 55 Q172 48 186 55" stroke-width="4"/>
+          <!-- Handlebars -->
+          <line x1="270" y1="70" x2="268" y2="50"/>
+          <path d="M255 50 Q268 42 281 50" stroke-width="3.5"/>
+          <!-- Pedal area -->
+          <circle cx="155" cy="160" r="14" opacity="0.7"/>
+          <line x1="143" y1="168" x2="167" y2="152" stroke-width="3"/>
+          <!-- Pedals -->
+          <line x1="139" y1="165" x2="139" y2="175" stroke-width="3.5"/>
+          <line x1="171" y1="149" x2="171" y2="155" stroke-width="3.5"/>
+        </svg>
+      </div>
+
+      <!-- Info Cards -->
+      <div class="info-cards">
+        <!-- Device Status -->
+        <div class="info-card" id="device-card">
+          <div class="info-card__icon info-card__icon--device" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg>
+          </div>
+          <div class="info-card__content">
+            <div class="info-card__label">Device Status</div>
+            <div class="info-card__value">
+              <span class="info-card__status-dot info-card__status-dot--connected" id="device-status-dot"></span>
+              <span id="device-status-value">Connected</span>
+            </div>
+          </div>
+          <div class="info-card__chevron" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </div>
+        </div>
+
+        <!-- Last Activity -->
+        <div class="info-card" id="activity-card">
+          <div class="info-card__icon info-card__icon--activity" id="activity-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="info-card__content">
+            <div class="info-card__label">Last Activity</div>
+            <div class="info-card__value">
+              <span id="activity-value">No movement detected</span>
+            </div>
+          </div>
+          <div class="info-card__chevron" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Action -->
+      <div class="action-section">
+        <button class="btn-primary btn-primary--arm" id="action-btn" type="button">
+          <span id="action-btn-icon" aria-hidden="true">
+            <!-- Icon injected by JS -->
+          </span>
+          <span id="action-btn-text">Turn ON Security</span>
+        </button>
+      </div>
+    </main>
+
+    <div class="app-footer-safe"></div>
+  </div>
+
+  <!-- ============================================
+       AUTHENTICATION BOTTOM SHEET (WebAuthn & PIN)
+       ============================================ -->
+  <div class="sheet-backdrop" id="sheet-backdrop" aria-hidden="true"></div>
+
+  <div class="pin-sheet auth-sheet" id="auth-sheet" role="dialog" aria-modal="true" aria-label="Authentication" aria-hidden="true">
+    <div class="pin-sheet__container">
+      <!-- Drag Handle -->
+      <div class="pin-sheet__handle" aria-hidden="true"></div>
+
+      <!-- VIEW 1: BIOMETRIC (Primary) -->
+      <div class="auth-view" id="auth-view-biometric">
+        <div class="bio-icon-wrapper" id="bio-icon-container">
+          <div class="bio-icon bio-icon--pulse" id="bio-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>
+          </div>
+        </div>
+        <div class="pin-sheet__header">
+          <h2 class="pin-sheet__title" id="bio-title">Verify identity</h2>
+          <p class="pin-sheet__subtitle" id="bio-subtitle">Use biometric authentication to continue.</p>
+        </div>
+        <div class="auth-sheet__actions">
+          <button class="btn-primary btn-primary--bio" id="bio-action-btn" type="button">
+            <span>Use biometric</span>
+          </button>
+          <button class="auth-sheet__link-btn" id="bio-fallback-btn" type="button">Use PIN instead</button>
+          <button class="pin-sheet__cancel" id="bio-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <!-- VIEW 2: PIN FALLBACK -->
+      <div class="auth-view" id="auth-view-pin" style="display: none;">
+        <div class="pin-sheet__header">
+          <h2 class="pin-sheet__title" id="pin-title">Enter PIN</h2>
+          <p class="pin-sheet__subtitle" id="pin-subtitle">Enter your 4-digit PIN.</p>
+        </div>
+
+        <!-- PIN Dots -->
+        <div class="pin-dots" id="pin-dots">
+          <div class="pin-dot"><span class="pin-dot__inner"></span></div>
+          <div class="pin-dot"><span class="pin-dot__inner"></span></div>
+          <div class="pin-dot"><span class="pin-dot__inner"></span></div>
+          <div class="pin-dot"><span class="pin-dot__inner"></span></div>
+        </div>
+
+        <!-- Error & Attempts Remaining -->
+        <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
+        <div class="pin-attempts" id="pin-attempts" role="status" aria-live="polite"></div>
+
+        <!-- Keypad -->
+        <div class="keypad" role="group" aria-label="PIN keypad">
+          <button class="keypad__key" data-key="1" type="button" aria-label="1">1</button>
+          <button class="keypad__key" data-key="2" type="button" aria-label="2">2</button>
+          <button class="keypad__key" data-key="3" type="button" aria-label="3">3</button>
+          <button class="keypad__key" data-key="4" type="button" aria-label="4">4</button>
+          <button class="keypad__key" data-key="5" type="button" aria-label="5">5</button>
+          <button class="keypad__key" data-key="6" type="button" aria-label="6">6</button>
+          <button class="keypad__key" data-key="7" type="button" aria-label="7">7</button>
+          <button class="keypad__key" data-key="8" type="button" aria-label="8">8</button>
+          <button class="keypad__key" data-key="9" type="button" aria-label="9">9</button>
+          <button class="keypad__key keypad__key--empty" type="button" disabled aria-hidden="true"></button>
+          <button class="keypad__key" data-key="0" type="button" aria-label="0">0</button>
+          <button class="keypad__key keypad__key--backspace" data-key="backspace" type="button" aria-label="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10l-7-7 7-7z"/><line x1="18" y1="9" x2="14" y2="13"/><line x1="14" y1="9" x2="18" y2="13"/></svg>
+          </button>
+        </div>
+
+        <!-- Actions -->
+        <div class="auth-sheet__actions">
+          <button class="auth-sheet__link-btn" id="pin-switch-bio" type="button">Use biometric instead</button>
+          <button class="pin-sheet__cancel" id="pin-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <!-- VIEW 3: LOCKOUT -->
+      <div class="auth-view" id="auth-view-lockout" style="display: none;">
+        <div class="lockout-icon-wrapper">
+          <div class="lockout-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          </div>
+        </div>
+        <div class="pin-sheet__header">
+          <h2 class="pin-sheet__title" id="lockout-title">Too many attempts</h2>
+          <p class="lockout-countdown" id="lockout-countdown">Try again in 30s</p>
+        </div>
+        <div class="auth-sheet__actions">
+          <button class="pin-sheet__cancel" id="lockout-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       SUCCESS OVERLAY
+       ============================================ -->
+  <div class="success-overlay" id="success-overlay" aria-hidden="true">
+    <div class="success-check">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </div>
+  </div>
+
+  <!-- ============================================
+       DEV PANEL (hidden by default — Ctrl+Shift+D)
+       ============================================ -->
+  <div class="dev-panel" id="dev-panel" aria-hidden="true">
+    <div class="dev-panel__title">Dev Controls</div>
+    <button class="dev-panel__btn" data-dev-action="connect" type="button">→ Connected</button>
+    <button class="dev-panel__btn" data-dev-action="disconnect" type="button">→ Disconnected</button>
+    <button class="dev-panel__btn" data-dev-action="security-on" type="button">→ Security ON</button>
+    <button class="dev-panel__btn" data-dev-action="security-off" type="button">→ Security OFF</button>
+    <button class="dev-panel__btn" data-dev-action="movement" type="button">→ Movement</button>
+    <button class="dev-panel__btn" data-dev-action="alarm" type="button">→ Alarm</button>
+    <div class="dev-panel__title" style="margin-top: 8px;">Auth Testing</div>
+    <button class="dev-panel__btn" data-dev-action="bio-success" type="button">⚡ Bio Success</button>
+    <button class="dev-panel__btn" data-dev-action="bio-failure" type="button">⚡ Bio Failed</button>
+    <button class="dev-panel__btn" data-dev-action="bio-unavailable" type="button">⚡ Bio Unavailable</button>
+    <button class="dev-panel__btn" data-dev-action="bio-lockout" type="button">⚡ Trigger Lockout</button>
+    <button class="dev-panel__btn" data-dev-action="register-passkey" type="button">🔑 Register Passkey</button>
+  </div>
+
+  <!-- App Script (ES Modules) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
