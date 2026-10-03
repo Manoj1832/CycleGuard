@@ -1,450 +1,978 @@
 /**
- * ============================================================================
  * CycleGuard — Smart Bicycle Security Firmware
- * Target: ESP32-C3 SuperMini
- * Framework: Arduino / ESP-IDF
+ * ESP32-C3 / Arduino Framework
  *
- * Physical Pinout:
- *  - SW-420 Vibration Sensor DO -> GPIO 4 (VCC -> 3V3, GND -> GND)
- *  - Active Piezo Buzzer        -> GPIO 5 (Positive -> GPIO 5, Negative -> GND)
- *  - Status LED                 -> GPIO 2 (Anode -> 220R -> GPIO 2, Cathode -> GND)
+ * Hardware:
+ *   SW-420 DO -> GPIO4
+ *   Active Buzzer -> GPIO5
+ *   LED -> GPIO2 through 220Ω resistor
  *
- * MQTT Topics:
- *  - Command: cycleguard/device/001/command  (Subscribed: ARM, DISARM)
- *  - Status:  cycleguard/device/001/status   (Published: DISARMED, ARMED, ALARM)
- *  - Alert:   cycleguard/device/001/alert    (Published: VIBRATION_DETECTED)
- * ============================================================================
+ * MQTT:
+ *   command -> cycleguard/device/{DEVICE_ID}/command
+ *   status  -> cycleguard/device/{DEVICE_ID}/status
+ *   alert   -> cycleguard/device/{DEVICE_ID}/alert
  */
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
-// Local configuration containing WiFi and MQTT broker credentials (git-ignored)
 #if __has_include("config.h")
   #include "config.h"
 #else
   #include "config.example.h"
 #endif
 
-// ============================================================================
-// HARDWARE PIN ASSIGNMENTS
-// ============================================================================
-#define PIN_SENSOR 4   // SW-420 Digital Output (DO)
-#define PIN_BUZZER 5   // Active Buzzer Positive (+)
-#define PIN_LED    2   // Status Indicator LED
 
-// ============================================================================
-// ALGORITHM & TIMING CONSTANTS
-// ============================================================================
-const unsigned long CONFIRMATION_WINDOW_MS = 3000; // 3 seconds confirmation window
-const int VIBRATION_THRESHOLD              = 3;    // 3 events required to trigger ALARM
-const unsigned long DEBOUNCE_INTERVAL_MS   = 100;  // 100 ms debounce between distinct pulses
-const unsigned long LED_BLINK_INTERVAL_MS  = 150;  // 150 ms toggle during ALARM
-const unsigned long MQTT_RECONNECT_MS      = 5000; // Retry MQTT every 5 seconds
-const unsigned long WIFI_RECONNECT_MS      = 10000;// Retry WiFi every 10 seconds
+// =====================================================
+// GPIO
+// =====================================================
 
-// ============================================================================
-// STATE MACHINE
-// ============================================================================
-enum DeviceState {
-  STATE_DISARMED,
+#define PIN_SENSOR 4
+#define PIN_BUZZER 5
+#define PIN_LED    2
+
+
+// =====================================================
+// Security States
+// =====================================================
+
+enum SecurityState {
+  STATE_OFF,
   STATE_ARMED,
   STATE_ALARM
 };
 
-DeviceState currentState = STATE_DISARMED;
-bool securityArmed = false;
+SecurityState currentState = STATE_OFF;
+
+
+// =====================================================
+// Alarm Variables
+// =====================================================
+
 bool alarmActive = false;
 
-// Vibration Tracking
 int vibrationCount = 0;
-unsigned long windowStartTime = 0;
-unsigned long lastVibrationEventTime = 0;
-int lastSensorPinState = LOW;
 
-// LED Blinking
-unsigned long lastLedBlinkTime = 0;
-bool ledBlinkState = false;
+unsigned long vibrationWindowStart = 0;
+unsigned long lastVibrationEvent = 0;
 
-// Reconnection Timers
-unsigned long lastMqttAttempt = 0;
-unsigned long lastWifiAttempt = 0;
+const unsigned long VIBRATION_WINDOW = 3000;
+const unsigned long VIBRATION_DEBOUNCE = 250;
 
-// Pending Alert Flag (in case alarm triggered while offline)
-bool pendingAlertToPublish = false;
+const int VIBRATION_THRESHOLD = 3;
 
-// ============================================================================
-// MQTT TOPICS & CLIENTS
-// ============================================================================
-const char* TOPIC_COMMAND = "cycleguard/device/001/command";
-const char* TOPIC_STATUS  = "cycleguard/device/001/status";
-const char* TOPIC_ALERT   = "cycleguard/device/001/alert";
+
+// =====================================================
+// LED / Buzzer Timing
+// =====================================================
+
+unsigned long lastAlarmToggle = 0;
+
+bool alarmOutputState = false;
+
+const unsigned long ALARM_TOGGLE_INTERVAL = 150;
+
+
+// =====================================================
+// Heartbeat
+// =====================================================
+
+unsigned long lastHeartbeat = 0;
+
+const unsigned long HEARTBEAT_INTERVAL = 30000;
+
+
+// =====================================================
+// MQTT Topics
+// =====================================================
+
+String topicCommand;
+String topicStatus;
+String topicAlert;
+
+
+// =====================================================
+// Network
+// =====================================================
 
 WiFiClientSecure tlsClient;
+
 PubSubClient mqttClient(tlsClient);
 
-// ============================================================================
-// FUNCTION DECLARATIONS
-// ============================================================================
+
+// =====================================================
+// Function Declarations
+// =====================================================
+
 void connectWiFi();
-void checkWiFiReconnection();
 void connectMQTT();
-void checkMQTTReconnection();
-void publishStatus(const char* statusPayload);
-void publishAlert(const char* alertPayload);
-void onMqttMessage(char* topic, byte* payload, unsigned int length);
-void enterArmedState();
-void enterDisarmedState();
+
+void publishStatus(bool retained = true);
+void publishAlert(const char* eventType);
+
+void onMqttMessage(
+  char* topic,
+  byte* payload,
+  unsigned int length
+);
+
+void handleArm();
+void handleDisarm();
+
+void processVibration();
 void triggerAlarm();
-void processVibrationSensor();
-void updateOutputs();
+void processAlarmOutputs();
 
-// ============================================================================
+void resetVibrationDetection();
+
+void soundChirp(int count);
+
+
+// =====================================================
 // SETUP
-// ============================================================================
-void setup() {
-  Serial.begin(115200);
-  delay(500);
+// =====================================================
 
-  // Initialize GPIOs
+void setup() {
+
+  Serial.begin(115200);
+
+  delay(1000);
+
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("       CYCLEGUARD ESP32-C3");
+  Serial.printf("       Device ID: %s\n", DEVICE_ID);
+  Serial.println("========================================");
+
+
+  // ---------------------------------------------------
+  // GPIO
+  // ---------------------------------------------------
+
   pinMode(PIN_SENSOR, INPUT);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_LED, OUTPUT);
 
-  // Default power-on state: DISARMED
   digitalWrite(PIN_BUZZER, LOW);
   digitalWrite(PIN_LED, LOW);
 
-  currentState = STATE_DISARMED;
-  securityArmed = false;
+
+  // ---------------------------------------------------
+  // MQTT Topics
+  // ---------------------------------------------------
+
+  topicCommand =
+    String("cycleguard/device/") +
+    DEVICE_ID +
+    "/command";
+
+  topicStatus =
+    String("cycleguard/device/") +
+    DEVICE_ID +
+    "/status";
+
+  topicAlert =
+    String("cycleguard/device/") +
+    DEVICE_ID +
+    "/alert";
+
+
+  // ---------------------------------------------------
+  // TLS
+  // ---------------------------------------------------
+
+  // Prototype only.
+  // Replace with CA certificate validation for production.
+  tlsClient.setInsecure();
+
+
+  // ---------------------------------------------------
+  // MQTT
+  // ---------------------------------------------------
+
+  mqttClient.setServer(
+    MQTT_HOST,
+    MQTT_PORT
+  );
+
+  mqttClient.setCallback(
+    onMqttMessage
+  );
+
+  mqttClient.setBufferSize(512);
+
+
+  // ---------------------------------------------------
+  // Startup
+  // ---------------------------------------------------
+
+  Serial.println("[System] Starting in DISARMED state");
+
+  currentState = STATE_OFF;
   alarmActive = false;
-  vibrationCount = 0;
 
-  Serial.println("\n========================================");
-  Serial.println("       CYCLEGUARD ESP32-C3");
-  Serial.println("========================================");
-  Serial.printf("Device ID: %s\n", DEVICE_ID);
-
-  // TLS Security Configuration
-  // EMQX Cloud uses Let's Encrypt / ISRG Root X1 certificates
-  tlsClient.setInsecure(); // For prototype ease; switch to tlsClient.setCACert() with ISRG Root X1 if certificate pinning is required
-
-  // Setup MQTT
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setCallback(onMqttMessage);
-  mqttClient.setBufferSize(256);
-
-  // Connect to Network & Broker
   connectWiFi();
   connectMQTT();
-
-  Serial.println("\nSTATE: DISARMED\n");
 }
 
-// ============================================================================
+
+// =====================================================
 // MAIN LOOP
-// ============================================================================
+// =====================================================
+
 void loop() {
-  unsigned long now = millis();
 
-  // 1. Maintain Network & MQTT Connectivity (non-blocking)
-  checkWiFiReconnection();
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!mqttClient.connected()) {
-      checkMQTTReconnection();
-    } else {
-      mqttClient.loop();
-    }
+  // ---------------------------------------------------
+  // Wi-Fi
+  // ---------------------------------------------------
+
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
   }
 
-  // 2. CRUCIAL: Local Vibration Detection runs continuously
-  // Works independently of WiFi or MQTT connection!
+
+  // ---------------------------------------------------
+  // MQTT
+  // ---------------------------------------------------
+
+  if (!mqttClient.connected()) {
+    connectMQTT();
+  }
+  else {
+    mqttClient.loop();
+  }
+
+
+  // ---------------------------------------------------
+  // Heartbeat
+  // ---------------------------------------------------
+
+  if (
+    mqttClient.connected() &&
+    millis() - lastHeartbeat >= HEARTBEAT_INTERVAL
+  ) {
+
+    lastHeartbeat = millis();
+
+    publishStatus(true);
+  }
+
+
+  // ---------------------------------------------------
+  // Vibration Detection
+  // ---------------------------------------------------
+
   if (currentState == STATE_ARMED) {
-    processVibrationSensor();
+
+    processVibration();
   }
 
-  // 3. Update Hardware Outputs (LED Blinking, Buzzer)
-  updateOutputs();
-}
 
-// ============================================================================
-// VIBRATION DETECTION & CONFIRMATION ALGORITHM
-// ============================================================================
-/**
- * Monitors SW-420 vibration sensor with debounce & confirmation window.
- *
- * Algorithm:
- *  1. Detect distinct rising-edge pulses with a 100 ms debounce.
- *  2. On first pulse, start a 3000 ms confirmation window.
- *  3. Increment counter for each subsequent distinct pulse.
- *  4. If counter reaches 3 pulses within 3000 ms -> enter ALARM state.
- *  5. If 3000 ms elapses before reaching 3 pulses -> reset counter to 0.
- */
-void processVibrationSensor() {
-  int currentPinState = digitalRead(PIN_SENSOR);
-  unsigned long now = millis();
+  // ---------------------------------------------------
+  // Alarm Output
+  // ---------------------------------------------------
 
-  // Detect edge transition from LOW to HIGH
-  if (currentPinState == HIGH && lastSensorPinState == LOW) {
-    if (now - lastVibrationEventTime >= DEBOUNCE_INTERVAL_MS) {
-      lastVibrationEventTime = now;
+  if (currentState == STATE_ALARM) {
 
-      // Start new confirmation window if this is the first pulse or if previous window expired
-      if (vibrationCount == 0 || (now - windowStartTime >= CONFIRMATION_WINDOW_MS)) {
-        windowStartTime = now;
-        vibrationCount = 1;
-        Serial.printf("VIBRATION EVENT: %d\n", vibrationCount);
-      } else {
-        vibrationCount++;
-        Serial.printf("VIBRATION EVENT: %d\n", vibrationCount);
-      }
-
-      // Check if threshold reached
-      if (vibrationCount >= VIBRATION_THRESHOLD) {
-        Serial.println("\n!!! SUSPICIOUS MOVEMENT !!!");
-        triggerAlarm();
-      }
-    }
+    processAlarmOutputs();
   }
-  lastSensorPinState = currentPinState;
 
-  // Window timeout expiration: reset count if 3 seconds elapse without reaching threshold
-  if (vibrationCount > 0 && (now - windowStartTime >= CONFIRMATION_WINDOW_MS)) {
-    vibrationCount = 0;
+
+  // ---------------------------------------------------
+  // Small loop delay
+  // ---------------------------------------------------
+
+  delay(5);
+}
+
+
+// =====================================================
+// WIFI
+// =====================================================
+
+void connectWiFi() {
+
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  Serial.printf(
+    "[WiFi] Connecting to %s",
+    WIFI_SSID
+  );
+
+  WiFi.mode(WIFI_STA);
+
+  WiFi.begin(
+    WIFI_SSID,
+    WIFI_PASSWORD
+  );
+
+  int attempts = 0;
+
+  while (
+    WiFi.status() != WL_CONNECTED &&
+    attempts < 20
+  ) {
+
+    delay(500);
+
+    Serial.print(".");
+
+    attempts++;
+  }
+
+
+  if (WiFi.status() == WL_CONNECTED) {
+
+    Serial.println();
+
+    Serial.println("[WiFi] Connected!");
+
+    Serial.print("[WiFi] IP: ");
+    Serial.println(WiFi.localIP());
+
+    Serial.print("[WiFi] RSSI: ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm");
+
+  }
+  else {
+
+    Serial.println();
+
+    Serial.println(
+      "[WiFi] Connection timeout"
+    );
   }
 }
 
-// ============================================================================
-// HARDWARE OUTPUT MANAGEMENT
-// ============================================================================
-void updateOutputs() {
-  unsigned long now = millis();
 
-  switch (currentState) {
-    case STATE_DISARMED:
-      digitalWrite(PIN_BUZZER, LOW);
-      digitalWrite(PIN_LED, LOW);
-      break;
+// =====================================================
+// MQTT
+// =====================================================
 
-    case STATE_ARMED:
-      digitalWrite(PIN_BUZZER, LOW);
-      digitalWrite(PIN_LED, HIGH); // Continuously ON when armed
-      break;
+void connectMQTT() {
 
-    case STATE_ALARM:
-      digitalWrite(PIN_BUZZER, HIGH); // Continuously ON during alarm
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
 
-      // Non-blocking LED blinking (150 ms toggle)
-      if (now - lastLedBlinkTime >= LED_BLINK_INTERVAL_MS) {
-        lastLedBlinkTime = now;
-        ledBlinkState = !ledBlinkState;
-        digitalWrite(PIN_LED, ledBlinkState ? HIGH : LOW);
-      }
-      break;
+  if (mqttClient.connected()) {
+    return;
+  }
+
+
+  Serial.print(
+    "[MQTT] Connecting to EMQX..."
+  );
+
+
+  String clientId =
+    String("cycleguard-esp32-") +
+    DEVICE_ID;
+
+
+  String lwtPayload =
+    String("{\"deviceId\":\"") +
+    DEVICE_ID +
+    "\",\"status\":\"OFFLINE\"}";
+
+
+  bool connected =
+    mqttClient.connect(
+      clientId.c_str(),
+      MQTT_USERNAME,
+      MQTT_PASSWORD,
+
+      topicStatus.c_str(),
+      1,
+      true,
+
+      lwtPayload.c_str()
+    );
+
+
+  if (connected) {
+
+    Serial.println(" connected!");
+
+
+    mqttClient.subscribe(
+      topicCommand.c_str(),
+      1
+    );
+
+
+    Serial.print(
+      "[MQTT] Subscribed: "
+    );
+
+    Serial.println(
+      topicCommand
+    );
+
+
+    publishStatus(true);
+
+  }
+  else {
+
+    Serial.print(
+      " failed, rc="
+    );
+
+    Serial.println(
+      mqttClient.state()
+    );
   }
 }
 
-// ============================================================================
-// STATE TRANSITIONS
-// ============================================================================
-/**
- * Transition to ARMED state.
- */
-void enterArmedState() {
-  currentState = STATE_ARMED;
-  securityArmed = true;
-  alarmActive = false;
-  vibrationCount = 0;
-  windowStartTime = 0;
-  lastVibrationEventTime = 0;
 
-  digitalWrite(PIN_BUZZER, LOW);
-  digitalWrite(PIN_LED, HIGH);
+// =====================================================
+// MQTT MESSAGE
+// =====================================================
 
-  Serial.println("========================================");
-  Serial.println("MQTT COMMAND");
-  Serial.println("========================================");
-  Serial.println("Command: ARM\n");
-  Serial.println("STATE: ARMED");
-  Serial.println("LED: ON");
-  Serial.println("BUZZER: OFF\n");
+void onMqttMessage(
+  char* topic,
+  byte* payload,
+  unsigned int length
+) {
 
-  publishStatus("ARMED");
-}
-
-/**
- * Transition to DISARMED state.
- * Immediately stops alarm, turns buzzer & LED OFF, and resets counters.
- */
-void enterDisarmedState() {
-  currentState = STATE_DISARMED;
-  securityArmed = false;
-  alarmActive = false;
-  vibrationCount = 0;
-  windowStartTime = 0;
-  lastVibrationEventTime = 0;
-  pendingAlertToPublish = false;
-
-  digitalWrite(PIN_BUZZER, LOW);
-  digitalWrite(PIN_LED, LOW);
-
-  Serial.println("\nCommand: DISARM\n");
-  Serial.println("STATE: DISARMED");
-  Serial.println("BUZZER: OFF");
-  Serial.println("LED: OFF\n");
-
-  publishStatus("DISARMED");
-}
-
-/**
- * Transition to ALARM state upon confirmed vibration.
- * Activates local buzzer & blinking LED, then publishes alert & status.
- */
-void triggerAlarm() {
-  currentState = STATE_ALARM;
-  alarmActive = true;
-  vibrationCount = 0;
-
-  digitalWrite(PIN_BUZZER, HIGH);
-
-  Serial.println("STATE: ALARM");
-  Serial.println("BUZZER: ON");
-  Serial.println("LED: BLINKING");
-  Serial.println("ALERT: VIBRATION_DETECTED\n");
-
-  // Publish exactly one alert event
-  publishAlert("VIBRATION_DETECTED");
-
-  // Publish updated status
-  publishStatus("ALARM");
-}
-
-// ============================================================================
-// MQTT MESSAGE HANDLER
-// ============================================================================
-void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   String message = "";
-  for (unsigned int i = 0; i < length; i++) {
-    message += (char)payload[i];
+
+
+  for (
+    unsigned int i = 0;
+    i < length;
+    i++
+  ) {
+
+    message +=
+      (char)payload[i];
   }
+
+
   message.trim();
 
-  // Extract command from plain string or JSON
-  String cmd = message;
-  if (message.indexOf("ARM") >= 0 && message.indexOf("DISARM") < 0) {
-    cmd = "ARM";
-  } else if (message.indexOf("DISARM") >= 0) {
-    cmd = "DISARM";
+
+  Serial.println();
+  Serial.println(
+    "========== MQTT COMMAND =========="
+  );
+
+  Serial.print("Topic: ");
+  Serial.println(topic);
+
+  Serial.print("Message: ");
+  Serial.println(message);
+
+
+  String command = "";
+
+
+  // ---------------------------------------------------
+  // JSON command
+  // {"command":"ARM"}
+  // ---------------------------------------------------
+
+  StaticJsonDocument<256> doc;
+
+  DeserializationError error =
+    deserializeJson(
+      doc,
+      message
+    );
+
+
+  if (
+    !error &&
+    doc.containsKey("command")
+  ) {
+
+    command =
+      doc["command"].as<String>();
   }
 
-  cmd.toUpperCase();
+  else {
 
-  if (cmd == "ARM") {
-    enterArmedState();
-  } else if (cmd == "DISARM") {
-    enterDisarmedState();
+    command = message;
+  }
+
+
+  command.toUpperCase();
+
+
+  // ---------------------------------------------------
+  // ARM
+  // ---------------------------------------------------
+
+  if (command == "ARM") {
+
+    handleArm();
+  }
+
+
+  // ---------------------------------------------------
+  // DISARM
+  // ---------------------------------------------------
+
+  else if (command == "DISARM") {
+
+    handleDisarm();
+  }
+
+
+  else {
+
+    Serial.print(
+      "[MQTT] Unknown command: "
+    );
+
+    Serial.println(command);
+  }
+
+
+  Serial.println(
+    "=================================="
+  );
+}
+
+
+// =====================================================
+// ARM
+// =====================================================
+
+void handleArm() {
+
+  Serial.println();
+  Serial.println(
+    "[Security] ARMED"
+  );
+
+
+  currentState = STATE_ARMED;
+
+  alarmActive = false;
+
+
+  resetVibrationDetection();
+
+
+  digitalWrite(
+    PIN_BUZZER,
+    LOW
+  );
+
+
+  digitalWrite(
+    PIN_LED,
+    HIGH
+  );
+
+
+  soundChirp(1);
+
+
+  publishStatus(true);
+}
+
+
+// =====================================================
+// DISARM
+// =====================================================
+
+void handleDisarm() {
+
+  Serial.println();
+  Serial.println(
+    "[Security] DISARMED"
+  );
+
+
+  currentState = STATE_OFF;
+
+  alarmActive = false;
+
+
+  resetVibrationDetection();
+
+
+  digitalWrite(
+    PIN_BUZZER,
+    LOW
+  );
+
+
+  digitalWrite(
+    PIN_LED,
+    LOW
+  );
+
+
+  soundChirp(2);
+
+
+  publishStatus(true);
+}
+
+
+// =====================================================
+// VIBRATION PROCESSING
+// =====================================================
+
+void processVibration() {
+
+  int sensorState =
+    digitalRead(PIN_SENSOR);
+
+
+  // Your working SW-420 setup
+  // detects vibration as HIGH.
+  if (sensorState != HIGH) {
+    return;
+  }
+
+
+  // ---------------------------------------------------
+  // Debounce
+  // ---------------------------------------------------
+
+  unsigned long now =
+    millis();
+
+
+  if (
+    now - lastVibrationEvent <
+    VIBRATION_DEBOUNCE
+  ) {
+
+    return;
+  }
+
+
+  lastVibrationEvent = now;
+
+
+  // ---------------------------------------------------
+  // Start new detection window
+  // ---------------------------------------------------
+
+  if (
+    vibrationCount == 0 ||
+    now - vibrationWindowStart >
+    VIBRATION_WINDOW
+  ) {
+
+    vibrationWindowStart = now;
+
+    vibrationCount = 0;
+  }
+
+
+  vibrationCount++;
+
+
+  Serial.print(
+    "[Sensor] Vibration event: "
+  );
+
+  Serial.println(
+    vibrationCount
+  );
+
+
+  // ---------------------------------------------------
+  // Threshold reached
+  // ---------------------------------------------------
+
+  if (
+    vibrationCount >=
+    VIBRATION_THRESHOLD
+  ) {
+
+    triggerAlarm();
   }
 }
 
-// ============================================================================
-// MQTT PUBLISH HELPERS
-// ============================================================================
-void publishStatus(const char* statusPayload) {
+
+// =====================================================
+// RESET VIBRATION DETECTION
+// =====================================================
+
+void resetVibrationDetection() {
+
+  vibrationCount = 0;
+
+  vibrationWindowStart = 0;
+
+  lastVibrationEvent = 0;
+}
+
+
+// =====================================================
+// TRIGGER ALARM
+// =====================================================
+
+void triggerAlarm() {
+
+  if (currentState == STATE_ALARM) {
+    return;
+  }
+
+
+  currentState = STATE_ALARM;
+
+  alarmActive = true;
+
+
+  Serial.println();
+  Serial.println(
+    "!!! SUSPICIOUS MOVEMENT !!!"
+  );
+
+  Serial.println(
+    "[Security] ALARM ACTIVE"
+  );
+
+
+  // Immediate buzzer
+  digitalWrite(
+    PIN_BUZZER,
+    HIGH
+  );
+
+
+  // Immediate LED
+  digitalWrite(
+    PIN_LED,
+    HIGH
+  );
+
+
+  // Reset output timer
+  lastAlarmToggle = millis();
+
+  alarmOutputState = true;
+
+
+  // Publish ONE alert
   if (mqttClient.connected()) {
-    mqttClient.publish(TOPIC_STATUS, statusPayload, true); // Retained status
-    Serial.printf("[MQTT] Status published -> %s\n", statusPayload);
+
+    publishAlert(
+      "MOVEMENT_DETECTED"
+    );
+
+    publishStatus(true);
   }
 }
 
-void publishAlert(const char* alertPayload) {
-  if (mqttClient.connected()) {
-    mqttClient.publish(TOPIC_ALERT, alertPayload, false);
-    Serial.printf("[MQTT] Alert published  -> %s\n", alertPayload);
-  } else {
-    // If offline when alarm triggered, mark pending to publish as soon as reconnected
-    pendingAlertToPublish = true;
+
+// =====================================================
+// ALARM OUTPUTS
+// =====================================================
+
+void processAlarmOutputs() {
+
+  unsigned long now =
+    millis();
+
+
+  if (
+    now - lastAlarmToggle >=
+    ALARM_TOGGLE_INTERVAL
+  ) {
+
+    lastAlarmToggle = now;
+
+    alarmOutputState =
+      !alarmOutputState;
+
+
+    digitalWrite(
+      PIN_BUZZER,
+      alarmOutputState
+    );
+
+
+    digitalWrite(
+      PIN_LED,
+      alarmOutputState
+    );
   }
 }
 
-// ============================================================================
-// WIFI CONNECTION & RECONNECT
-// ============================================================================
-void connectWiFi() {
-  Serial.printf("Connecting to WiFi: %s", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - start < 8000)) {
-    delay(400);
-    Serial.print(".");
-  }
+// =====================================================
+// STATUS
+// =====================================================
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected");
-    Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
-    Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
-  } else {
-    Serial.println("\n[WiFi] Could not connect immediately. Retrying in background...");
-  }
-}
+void publishStatus(bool retained) {
 
-void checkWiFiReconnection() {
-  unsigned long now = millis();
-  if (WiFi.status() != WL_CONNECTED) {
-    if (now - lastWifiAttempt >= WIFI_RECONNECT_MS) {
-      lastWifiAttempt = now;
-      Serial.println("[WiFi] Reconnecting...");
-      WiFi.reconnect();
-    }
-  }
-}
-
-// ============================================================================
-// MQTT CONNECTION & RECONNECT
-// ============================================================================
-void connectMQTT() {
-  if (WiFi.status() != WL_CONNECTED) return;
-  if (mqttClient.connected()) return;
-
-  Serial.println("Connecting to EMQX...");
-
-  String clientId = String("cycleguard-esp32-") + DEVICE_ID;
-  const char* lwtPayload = "DISARMED";
-
-  // Last Will and Testament: if connection drops abruptly, broker retains DISARMED/OFFLINE
-  if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD,
-                         TOPIC_STATUS, 1, true, lwtPayload)) {
-    Serial.println("MQTT connected\n");
-
-    // Subscribe to command topic
-    mqttClient.subscribe(TOPIC_COMMAND, 1);
-    Serial.println("Subscribed:");
-    Serial.println(TOPIC_COMMAND);
-
-    // Publish current state on connect
-    const char* currentPayload = (currentState == STATE_ARMED) ? "ARMED" :
-                                 (currentState == STATE_ALARM) ? "ALARM" : "DISARMED";
-    publishStatus(currentPayload);
-
-    // If an alert was triggered while offline, deliver it now
-    if (pendingAlertToPublish) {
-      pendingAlertToPublish = false;
-      publishAlert("VIBRATION_DETECTED");
-    }
-  } else {
-    Serial.printf("[MQTT] Connection failed (rc=%d). Retrying in 5s...\n", mqttClient.state());
-  }
-}
-
-void checkMQTTReconnection() {
-  unsigned long now = millis();
   if (!mqttClient.connected()) {
-    if (now - lastMqttAttempt >= MQTT_RECONNECT_MS) {
-      lastMqttAttempt = now;
-      connectMQTT();
+    return;
+  }
+
+
+  StaticJsonDocument<256> doc;
+
+
+  doc["deviceId"] =
+    DEVICE_ID;
+
+
+  doc["status"] =
+    "ONLINE";
+
+
+  switch (currentState) {
+
+    case STATE_ARMED:
+
+      doc["securityState"] =
+        "ON";
+
+      break;
+
+
+    case STATE_ALARM:
+
+      doc["securityState"] =
+        "ALARM";
+
+      break;
+
+
+    case STATE_OFF:
+
+    default:
+
+      doc["securityState"] =
+        "OFF";
+
+      break;
+  }
+
+
+  doc["alarmActive"] =
+    alarmActive;
+
+
+  char buffer[256];
+
+
+  serializeJson(
+    doc,
+    buffer
+  );
+
+
+  mqttClient.publish(
+    topicStatus.c_str(),
+    buffer,
+    retained
+  );
+
+
+  Serial.print(
+    "[MQTT] Status: "
+  );
+
+  Serial.println(
+    buffer
+  );
+}
+
+
+// =====================================================
+// ALERT
+// =====================================================
+
+void publishAlert(
+  const char* eventType
+) {
+
+  if (!mqttClient.connected()) {
+    return;
+  }
+
+
+  StaticJsonDocument<256> doc;
+
+
+  doc["deviceId"] =
+    DEVICE_ID;
+
+
+  doc["event"] =
+    eventType;
+
+
+  doc["timestamp"] =
+    millis();
+
+
+  char buffer[256];
+
+
+  serializeJson(
+    doc,
+    buffer
+  );
+
+
+  mqttClient.publish(
+    topicAlert.c_str(),
+    buffer,
+    false
+  );
+
+
+  Serial.print(
+    "[MQTT] Alert: "
+  );
+
+  Serial.println(
+    buffer
+  );
+}
+
+
+// =====================================================
+// BUZZER CHIRP
+// =====================================================
+
+void soundChirp(
+  int count
+) {
+
+  for (
+    int i = 0;
+    i < count;
+    i++
+  ) {
+
+    digitalWrite(
+      PIN_BUZZER,
+      HIGH
+    );
+
+    delay(80);
+
+    digitalWrite(
+      PIN_BUZZER,
+      LOW
+    );
+
+
+    if (
+      i < count - 1
+    ) {
+
+      delay(80);
     }
   }
 }
