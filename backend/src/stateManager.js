@@ -128,8 +128,8 @@ class StateManager extends EventEmitter {
     if (!pending) return false;
 
     const matches =
-      (pending.action === 'ARM' && confirmedState === 'ON') ||
-      (pending.action === 'DISARM' && confirmedState === 'OFF') ||
+      (pending.action === 'ARM' && (confirmedState === 'ON' || confirmedState === 'ARMED')) ||
+      (pending.action === 'DISARM' && (confirmedState === 'OFF' || confirmedState === 'DISARMED')) ||
       (pending.action === 'ALARM_CLEAR' && confirmedState !== 'ALARM');
 
     if (matches) {

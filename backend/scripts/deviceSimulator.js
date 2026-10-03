@@ -47,30 +47,19 @@ const client = mqtt.connect(`mqtts://${host}:${port}`, {
 });
 
 function publishStatus() {
-  const payload = {
-    deviceId,
-    status: 'ONLINE',
-    securityState,
-    alarmActive,
-    timestamp: new Date().toISOString(),
-  };
+  const statusStr = securityState === 'ON' ? 'ARMED' :
+                    securityState === 'ALARM' ? 'ALARM' : 'DISARMED';
 
-  client.publish(topicStatus, JSON.stringify(payload), { qos: 1, retain: true }, (err) => {
+  client.publish(topicStatus, statusStr, { qos: 1, retain: true }, (err) => {
     if (err) console.error('[Simulator] Status publish error:', err.message);
-    else console.log(`[Simulator] Status published -> securityState: ${securityState}, alarmActive: ${alarmActive}`);
+    else console.log(`[Simulator] Status published -> ${statusStr}`);
   });
 }
 
 function publishMovementAlert() {
-  const payload = {
-    deviceId,
-    event: 'MOVEMENT_DETECTED',
-    timestamp: new Date().toISOString(),
-  };
-
-  client.publish(topicAlert, JSON.stringify(payload), { qos: 1 }, (err) => {
+  client.publish(topicAlert, 'VIBRATION_DETECTED', { qos: 1 }, (err) => {
     if (err) console.error('[Simulator] Alert publish error:', err.message);
-    else console.log('[Simulator] 🚨 Alert published -> MOVEMENT_DETECTED');
+    else console.log('[Simulator] 🚨 Alert published -> VIBRATION_DETECTED');
   });
 }
 

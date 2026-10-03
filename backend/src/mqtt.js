@@ -54,12 +54,15 @@ function connectMqtt() {
   });
 
   client.on('message', (topic, message) => {
+    const raw = message.toString().trim();
+    let payload;
     try {
-      const payload = JSON.parse(message.toString());
-      handleMqttMessage(topic, payload);
-    } catch (err) {
-      console.error('[MQTT] Failed to parse message:', err.message);
+      payload = JSON.parse(raw);
+    } catch (e) {
+      // Support raw string payloads (e.g. "ARMED", "DISARMED", "ALARM", "VIBRATION_DETECTED")
+      payload = raw;
     }
+    handleMqttMessage(topic, payload);
   });
 
   client.on('error', (err) => {
@@ -85,42 +88,72 @@ function connectMqtt() {
 
 /**
  * Handle incoming MQTT messages from device.
+ * Supports both plain-string payloads (DISARMED, ARMED, ALARM, VIBRATION_DETECTED)
+ * and structured JSON payloads.
  */
 function handleMqttMessage(topic, payload) {
-  const deviceId = payload.deviceId || config.defaultDeviceId;
-  console.log(`[MQTT] Message on ${topic}:`, JSON.stringify(payload));
+  let deviceId = config.defaultDeviceId;
+  let statusStr = null;
+  let eventStr = null;
+  let alarmActive = null;
+
+  if (typeof payload === 'string') {
+    const str = payload.toUpperCase();
+    console.log(`[MQTT] Raw message on ${topic}:`, str);
+    if (topic.endsWith('/status')) {
+      statusStr = str;
+    } else if (topic.endsWith('/alert')) {
+      eventStr = str;
+    }
+  } else if (typeof payload === 'object' && payload !== null) {
+    console.log(`[MQTT] JSON message on ${topic}:`, JSON.stringify(payload));
+    deviceId = payload.deviceId || config.defaultDeviceId;
+    statusStr = (payload.securityState || payload.status || '').toUpperCase();
+    eventStr = (payload.event || payload.type || '').toUpperCase();
+    if (typeof payload.alarmActive === 'boolean') {
+      alarmActive = payload.alarmActive;
+    }
+  }
 
   // Match topic pattern
   if (topic.endsWith('/status')) {
     const updates = {};
 
-    if (payload.securityState) {
-      updates.securityState = payload.securityState;
-      // Finding F1: Clear pending action when confirmed by physical device
-      stateManager.checkAndClearPending(deviceId, payload.securityState);
-    }
-
-    if (typeof payload.alarmActive === 'boolean') {
-      updates.alarmActive = payload.alarmActive;
-    }
-
-    // Finding F7 & F8: Any status message from device confirms it is connected
-    if (payload.status === 'ONLINE' || payload.securityState) {
+    if (statusStr === 'ARMED' || statusStr === 'ON') {
+      updates.securityState = 'ON';
+      updates.alarmActive = false;
+      stateManager.checkAndClearPending(deviceId, 'ON');
       stateManager.setConnectionState(deviceId, 'CONNECTED');
-    } else if (payload.status === 'OFFLINE') {
+    } else if (statusStr === 'DISARMED' || statusStr === 'OFF') {
+      updates.securityState = 'OFF';
+      updates.alarmActive = false;
+      stateManager.checkAndClearPending(deviceId, 'OFF');
+      stateManager.setConnectionState(deviceId, 'CONNECTED');
+    } else if (statusStr === 'ALARM') {
+      updates.securityState = 'ALARM';
+      updates.alarmActive = true;
+      stateManager.checkAndClearPending(deviceId, 'ALARM');
+      stateManager.setConnectionState(deviceId, 'CONNECTED');
+    } else if (statusStr === 'ONLINE') {
+      stateManager.setConnectionState(deviceId, 'CONNECTED');
+    } else if (statusStr === 'OFFLINE') {
       stateManager.setConnectionState(deviceId, 'DISCONNECTED');
+    }
+
+    if (alarmActive !== null) {
+      updates.alarmActive = alarmActive;
     }
 
     if (Object.keys(updates).length > 0) {
       stateManager.updateDevice(deviceId, updates);
     }
   } else if (topic.endsWith('/alert')) {
-    // Alert from device
-    if (payload.event === 'MOVEMENT_DETECTED' || payload.type === 'MOVEMENT_DETECTED' || payload.event === 'MOVEMENT') {
-      stateManager.recordMovement(deviceId, payload.timestamp);
+    if (eventStr === 'VIBRATION_DETECTED' || eventStr === 'MOVEMENT_DETECTED' || eventStr === 'MOVEMENT') {
+      stateManager.recordMovement(deviceId);
+      stateManager.activateAlarm(deviceId);
     }
-    if (payload.event === 'ALARM_ACTIVE') {
-      stateManager.activateAlarm(deviceId, payload.timestamp);
+    if (eventStr === 'ALARM_ACTIVE') {
+      stateManager.activateAlarm(deviceId);
     }
   } else if (topic.endsWith('/test')) {
     console.log(`[MQTT] Test message from device ${deviceId}:`, payload);
@@ -139,12 +172,9 @@ function publishCommand(deviceId, command) {
   }
 
   const topic = config.topics.command(deviceId);
-  const payload = JSON.stringify({
-    command,
-    timestamp: new Date().toISOString(),
-  });
 
-  client.publish(topic, payload, { qos: 1 }, (err) => {
+  // Send exact command string ("ARM" or "DISARM")
+  client.publish(topic, command, { qos: 1 }, (err) => {
     if (err) {
       console.error('[MQTT] Publish error:', err);
     } else {
