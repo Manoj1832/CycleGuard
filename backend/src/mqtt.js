@@ -7,6 +7,7 @@
 const mqtt = require('mqtt');
 const config = require('./config');
 const stateManager = require('./stateManager');
+const pushNotification = require('./pushNotification');
 
 let client = null;
 let isConnected = false;
@@ -151,9 +152,11 @@ function handleMqttMessage(topic, payload) {
     if (eventStr === 'VIBRATION_DETECTED' || eventStr === 'MOVEMENT_DETECTED' || eventStr === 'MOVEMENT') {
       stateManager.recordMovement(deviceId);
       stateManager.activateAlarm(deviceId);
+      pushNotification.sendAlarmNotification(deviceId, { type: eventStr });
     }
     if (eventStr === 'ALARM_ACTIVE') {
       stateManager.activateAlarm(deviceId);
+      pushNotification.sendAlarmNotification(deviceId, { type: 'ALARM_ACTIVE' });
     }
   } else if (topic.endsWith('/test')) {
     console.log(`[MQTT] Test message from device ${deviceId}:`, payload);

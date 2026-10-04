@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "26708422878",
+    "project_id": "cycleguard-446d2",
+    "storage_bucket": "cycleguard-446d2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:26708422878:android:64a90b1a21216f4b57524f",
+        "android_client_info": {
+          "package_name": "com.cycleguard.cycleguard_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJQJbHCpBb8nuxQLmoP_xdXbkTl36NhRw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

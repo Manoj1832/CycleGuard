@@ -8,6 +8,7 @@ import { getState, setState, subscribe } from './state.js';
 import { initUI } from './ui.js';
 import { initAuth, simulateBiometric, handleRegisterPasskey } from './auth.js';
 import { connectWebSocket } from './websocket.js';
+import { startAlarm, stopAlarm, playChirp, initAudioUnlock } from './audio.js';
 
 /**
  * Boot the application.
@@ -17,6 +18,9 @@ function init() {
   console.log('[CycleGuard] Mock mode:', CONFIG.MOCK_MODE);
   console.log('[CycleGuard] Auth Mock mode:', CONFIG.AUTH_MOCK_MODE);
 
+  // Initialize Web Audio unlock
+  initAudioUnlock();
+
   // Initialize UI renderer
   initUI();
 
@@ -25,6 +29,26 @@ function init() {
 
   // Connect WebSocket (mock mode will skip actual connection)
   connectWebSocket();
+
+  // Set up audio alarm listener on security state
+  let prevAlarm = false;
+  let prevSecurity = null;
+  subscribe((state) => {
+    const isAlarm = state.securityState === 'ALARM' || state.alarmActive === true;
+
+    if (isAlarm && !prevAlarm) {
+      startAlarm();
+    } else if (!isAlarm && prevAlarm) {
+      stopAlarm();
+    }
+    prevAlarm = isAlarm;
+
+    if (prevSecurity !== null && state.securityState !== prevSecurity && !isAlarm) {
+      if (state.securityState === 'ON') playChirp('ARM');
+      else if (state.securityState === 'OFF') playChirp('DISARM');
+    }
+    prevSecurity = state.securityState;
+  });
 
   // Set up settings button
   initSettingsButton();
