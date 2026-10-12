@@ -31,9 +31,9 @@
   <div class="app-shell" id="app">
 
     <!-- Connection / Alert Banner -->
-    <div class="connection-banner" id="connection-banner" role="status" aria-live="polite">
+    <div class="connection-banner connection-banner--offline connection-banner--visible" id="connection-banner" role="status" aria-live="polite">
       <span class="connection-banner__dot"></span>
-      <span id="connection-banner-text">Reconnecting to device...</span>
+      <span id="connection-banner-text">Device is Offline — Unit disconnected</span>
     </div>
 
     <!-- Header (Dynamic per screen) -->
@@ -102,9 +102,9 @@
               <span class="device-preview-name">CycleGuard Sensor Unit</span>
               <span class="device-preview-sub">Bike #001 • Real-time Protection</span>
             </div>
-            <span class="status-badge status-badge--online" id="home-device-badge">
+            <span class="status-badge status-badge--offline" id="home-device-badge">
               <span class="status-badge__dot"></span>
-              <span id="home-device-status-text">Connected</span>
+              <span id="home-device-status-text">Offline</span>
             </span>
           </div>
 
@@ -116,7 +116,7 @@
             </div>
             <div class="meta-item">
               <span class="meta-item__label">Sensor Guard</span>
-              <span class="meta-item__value" id="home-vibration-status">Monitoring</span>
+              <span class="meta-item__value" id="home-vibration-status">Offline (No Link)</span>
             </div>
             <div class="meta-item">
               <span class="meta-item__label">Security State</span>
@@ -146,9 +146,9 @@
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Live Hardware Status</h2>
-            <span class="status-badge status-badge--online" id="device-tab-badge">
+            <span class="status-badge status-badge--offline" id="device-tab-badge">
               <span class="status-badge__dot"></span>
-              <span id="device-tab-status-text">Online</span>
+              <span id="device-tab-status-text">Offline</span>
             </span>
           </div>
 
