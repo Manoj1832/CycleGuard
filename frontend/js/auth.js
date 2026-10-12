@@ -12,6 +12,7 @@ import { getState, setState, subscribe } from './state.js';
 import * as API from './api.js';
 import * as WebAuthn from './webauthn.js';
 import * as Icons from './icons.js';
+import { playChirp, stopAlarm, startAlarm } from './audio.js';
 
 // ---- Module State ----
 let currentAction = null; // 'ARM' | 'DISARM' | 'ALARM_CLEAR'
@@ -119,7 +120,7 @@ function bindEvents() {
       hidePinError();
 
       if (pinDigits.length === 4) {
-        setTimeout(submitPin, CONFIG.PIN_VERIFY_DELAY);
+        submitPin();
       }
     });
 
@@ -490,7 +491,7 @@ function handlePinKeypadPress(key) {
       hidePinError();
 
       if (pinDigits.length === 4) {
-        setTimeout(submitPin, CONFIG.PIN_VERIFY_DELAY);
+        submitPin();
       }
     }
   } else if (key === 'backspace') {
@@ -539,24 +540,96 @@ function handleKeyboardInput(e) {
 
 /**
  * Submit PIN for server verification.
+ * ⚡ INSTANT ZERO-LATENCY OPTIMISTIC ARM / DISARM / ALARM CLEAR
  */
 async function submitPin() {
   if (isVerifying) return;
   isVerifying = true;
-  setState({ authFlowState: 'PIN_VERIFYING' });
 
   const enteredPin = pinDigits.join('');
+  if (enteredPin.length !== 4) {
+    isVerifying = false;
+    return;
+  }
 
-  try {
-    const result = await API.verifyPin(enteredPin, currentAction);
+  const action = currentAction;
+  const prevState = getState();
+  const prevSecurityState = prevState.securityState;
+  const prevAlarmActive = prevState.alarmActive;
 
-    if (result.success && result.authToken) {
-      onAuthSuccess(result.authToken);
-    } else {
-      onPinFailed(result);
+  // Passkey enrolment fallback flow
+  if (action === 'REGISTER_PASSKEY') {
+    setState({ authFlowState: 'PIN_VERIFYING' });
+    try {
+      const result = await API.verifyPin(enteredPin, action);
+      if (result.success && result.authToken) {
+        closeAuthSheet();
+        registerPasskeyWithToken(result.authToken);
+      } else {
+        onPinFailed(result);
+      }
+    } catch (err) {
+      onPinFailed(err);
+    } finally {
+      isVerifying = false;
     }
+    return;
+  }
+
+  // ==============================================================
+  // ⚡ INSTANT 0ms OPTIMISTIC REFLECTION
+  // ==============================================================
+  closeAuthSheet();
+
+  if (action === 'ARM') {
+    playChirp('ARM');
+    setState({
+      securityState: 'ON',
+      alarmActive: false,
+      isActionPending: false,
+      pendingStatusMessage: null,
+    });
+  } else if (action === 'DISARM') {
+    playChirp('DISARM');
+    setState({
+      securityState: 'OFF',
+      alarmActive: false,
+      isActionPending: false,
+      pendingStatusMessage: null,
+    });
+  } else if (action === 'ALARM_CLEAR') {
+    stopAlarm();
+    playChirp('DISARM');
+    setState({
+      securityState: 'OFF',
+      alarmActive: false,
+      isActionPending: false,
+      pendingStatusMessage: null,
+    });
+  }
+
+  // Direct single-request execution in parallel
+  try {
+    const deviceId = getState().deviceId || CONFIG.DEVICE_ID;
+    if (action === 'ARM') {
+      await API.armDevice(deviceId, { pin: enteredPin });
+    } else if (action === 'DISARM') {
+      await API.disarmDevice(deviceId, { pin: enteredPin });
+    } else if (action === 'ALARM_CLEAR') {
+      await API.clearAlarm(deviceId, { pin: enteredPin });
+    }
+    console.log(`[Security] Instant ${action} confirmed by server.`);
   } catch (err) {
-    // Check if error response has lockout or attempt details
+    console.error(`[Security] Instant ${action} failed:`, err);
+    // ROLLBACK ON REJECTION (e.g. Incorrect PIN)
+    setState({
+      securityState: prevSecurityState,
+      alarmActive: prevAlarmActive,
+    });
+    if (prevAlarmActive) {
+      startAlarm();
+    }
+    openAuthSheet(action);
     onPinFailed(err);
   } finally {
     isVerifying = false;
@@ -761,29 +834,21 @@ function onAuthSuccess(authToken) {
  * Shows pending status and waits for device confirmation via WebSocket.
  */
 async function executeSecurityCommand(action, authToken) {
-  // Prevent duplicate clicks
-  setState({
-    isActionPending: true,
-    pendingStatusMessage: getPendingStatusText(action),
-  });
-
-  // Start confirmation timeout guard (8s)
-  if (commandTimeoutId) clearTimeout(commandTimeoutId);
-  commandTimeoutId = setTimeout(() => {
-    const currentState = getState();
-    if (currentState.isActionPending) {
-      console.warn('[Security] Device did not respond within timeout.');
-      setState({
-        isActionPending: false,
-        pendingStatusMessage: null,
-      });
-      showTemporaryToast('Device did not respond. Check connection.', true);
-    }
-  }, CONFIG.COMMAND_TIMEOUT_MS);
+  // Optimistic instant reflection for WebAuthn/Passkey as well
+  if (action === 'ARM') {
+    playChirp('ARM');
+    setState({ securityState: 'ON', alarmActive: false, isActionPending: false });
+  } else if (action === 'DISARM') {
+    playChirp('DISARM');
+    setState({ securityState: 'OFF', alarmActive: false, isActionPending: false });
+  } else if (action === 'ALARM_CLEAR') {
+    stopAlarm();
+    playChirp('DISARM');
+    setState({ securityState: 'OFF', alarmActive: false, isActionPending: false });
+  }
 
   try {
     const deviceId = getState().deviceId || CONFIG.DEVICE_ID;
-
     switch (action) {
       case 'ARM':
         await API.armDevice(deviceId, { authToken });
@@ -795,15 +860,9 @@ async function executeSecurityCommand(action, authToken) {
         await API.clearAlarm(deviceId, { authToken });
         break;
     }
-
-    console.log(`[Security] Command ${action} published successfully via backend MQTT.`);
+    console.log(`[Security] Command ${action} published successfully.`);
   } catch (err) {
     console.error(`[Security] Command ${action} failed:`, err.message);
-    if (commandTimeoutId) clearTimeout(commandTimeoutId);
-    setState({
-      isActionPending: false,
-      pendingStatusMessage: null,
-    });
     showTemporaryToast(`Failed: ${err.message}`, true);
   }
 }

@@ -14,9 +14,10 @@ const config = {
     port: parseInt(process.env.MQTT_PORT, 10) || 8883,
     username: process.env.MQTT_USERNAME || 'cycleguard',
     password: process.env.MQTT_PASSWORD || '',
-    clientId: process.env.MQTT_CLIENT_ID || 'cycleguard-backend-primary',
-    reconnectPeriod: 5000,
-    connectTimeout: 30000,
+    clientId: process.env.MQTT_CLIENT_ID || `cycleguard-backend-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    reconnectPeriod: 2000,
+    connectTimeout: 10000,
+    keepalive: 30,
   },
 
   cors: {

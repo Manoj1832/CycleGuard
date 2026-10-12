@@ -33,6 +33,7 @@ function connectMqtt() {
     password,
     reconnectPeriod,
     connectTimeout,
+    keepalive: config.mqtt.keepalive || 30,
     clean: true,
     rejectUnauthorized: true, // Verify TLS certificate
   });
