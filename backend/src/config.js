@@ -49,6 +49,19 @@ const config = {
   // Device
   defaultDeviceId: '001',
 
+  // Demo / Mock mode — disabled by default; never enable in production from client input
+  demoMode: process.env.CYCLEGUARD_DEMO_MODE === 'true',
+
+  // Machine Learning microservice (Python FastAPI)
+  ml: {
+    apiUrl: process.env.ML_API_URL || 'http://127.0.0.1:5001',
+    enabled: process.env.ML_ENABLED !== 'false', // enabled by default, disable with ML_ENABLED=false
+    timeoutMs: parseInt(process.env.ML_TIMEOUT_MS, 10) || 3000,
+  },
+
+  // Learning-ready data consent — disabled by default until user opts in
+  learningConsent: process.env.CYCLEGUARD_LEARNING_CONSENT === 'true',
+
   // MQTT Topics
   topics: {
     command: (deviceId) => `cycleguard/device/${deviceId}/command`,
@@ -67,6 +80,7 @@ Object.freeze(config);
 Object.freeze(config.mqtt);
 Object.freeze(config.cors);
 Object.freeze(config.auth);
+Object.freeze(config.ml);
 Object.freeze(config.topics);
 
 module.exports = config;

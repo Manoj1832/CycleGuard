@@ -8,9 +8,13 @@ const mqtt = require('mqtt');
 const config = require('./config');
 const stateManager = require('./stateManager');
 const pushNotification = require('./pushNotification');
+const eventService = require('./eventService');
 
 let client = null;
 let isConnected = false;
+
+// Track previous device states to avoid duplicate event records on reconnects/snapshots
+const previousStates = new Map(); // deviceId -> { securityState, connectionState }
 
 /**
  * Connect to MQTT broker.
@@ -116,6 +120,9 @@ function handleMqttMessage(topic, payload) {
     }
   }
 
+  // Get previous tracked state for deduplication
+  const prev = previousStates.get(deviceId) || { securityState: null, connectionState: null };
+
   // Match topic pattern
   if (topic.endsWith('/status')) {
     const updates = {};
@@ -125,11 +132,52 @@ function handleMqttMessage(topic, payload) {
       updates.alarmActive = false;
       stateManager.checkAndClearPending(deviceId, 'ON');
       stateManager.setConnectionState(deviceId, 'CONNECTED');
+
+      // Record event only on genuine state transition (not reconnect snapshot)
+      if (prev.securityState !== 'ON') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_ARMED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Security mode enabled (confirmed by device)',
+          details: { previousState: prev.securityState },
+        });
+      }
+      if (prev.connectionState !== 'CONNECTED') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_CONNECTED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Device connected to network',
+        });
+      }
     } else if (statusStr === 'DISARMED' || statusStr === 'OFF') {
       updates.securityState = 'OFF';
       updates.alarmActive = false;
       stateManager.checkAndClearPending(deviceId, 'OFF');
       stateManager.setConnectionState(deviceId, 'CONNECTED');
+
+      if (prev.securityState !== 'OFF') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_DISARMED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Security mode disabled (confirmed by device)',
+          details: { previousState: prev.securityState },
+        });
+      }
+      if (prev.connectionState !== 'CONNECTED') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_CONNECTED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Device connected to network',
+        });
+      }
     } else if (statusStr === 'ALARM') {
       updates.securityState = 'ALARM';
       updates.alarmActive = true;
@@ -137,9 +185,34 @@ function handleMqttMessage(topic, payload) {
       stateManager.setConnectionState(deviceId, 'CONNECTED');
     } else if (statusStr === 'ONLINE') {
       stateManager.setConnectionState(deviceId, 'CONNECTED');
+      if (prev.connectionState !== 'CONNECTED') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_CONNECTED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Device connected to network',
+        });
+      }
     } else if (statusStr === 'OFFLINE') {
       stateManager.setConnectionState(deviceId, 'DISCONNECTED');
+      if (prev.connectionState !== 'DISCONNECTED') {
+        eventService.recordEvent({
+          deviceId,
+          type: 'DEVICE_DISCONNECTED',
+          source: 'real',
+          origin: 'mqtt',
+          message: 'Device disconnected from network',
+        });
+      }
     }
+
+    // Update previous state tracker
+    if (updates.securityState) prev.securityState = updates.securityState;
+    if (statusStr === 'ONLINE') prev.connectionState = 'CONNECTED';
+    if (statusStr === 'OFFLINE') prev.connectionState = 'DISCONNECTED';
+    if (updates.securityState) prev.connectionState = 'CONNECTED';
+    previousStates.set(deviceId, prev);
 
     if (alarmActive !== null) {
       updates.alarmActive = alarmActive;
@@ -153,10 +226,28 @@ function handleMqttMessage(topic, payload) {
       stateManager.recordMovement(deviceId);
       stateManager.activateAlarm(deviceId);
       pushNotification.sendAlarmNotification(deviceId, { type: eventStr });
+
+      eventService.recordEvent({
+        deviceId,
+        type: 'MOVEMENT_DETECTED',
+        source: 'real',
+        origin: 'mqtt',
+        message: 'Movement detected by device sensor',
+        details: { rawEvent: eventStr },
+      });
     }
     if (eventStr === 'ALARM_ACTIVE') {
       stateManager.activateAlarm(deviceId);
       pushNotification.sendAlarmNotification(deviceId, { type: 'ALARM_ACTIVE' });
+
+      eventService.recordEvent({
+        deviceId,
+        type: 'ALARM_ACTIVATED',
+        source: 'real',
+        origin: 'mqtt',
+        message: 'Alarm activated — movement detected while armed',
+        details: { rawEvent: eventStr },
+      });
     }
   } else if (topic.endsWith('/test')) {
     console.log(`[MQTT] Test message from device ${deviceId}:`, payload);

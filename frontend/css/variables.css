@@ -1,72 +1,83 @@
 /* ==============================================
    CycleGuard — Design Tokens
-   Centralized CSS custom properties
+   Strictly aligned with Reference Design System
    ============================================== */
 
 :root {
-  /* ---- Brand Colors ---- */
-  --primary: #2563eb;
-  --primary-light: #3b82f6;
-  --primary-dark: #1d4ed8;
-  --primary-bg: rgba(37, 99, 235, 0.08);
-  --primary-bg-strong: rgba(37, 99, 235, 0.15);
+  /* ---- Canvas & Surfaces ---- */
+  --app-bg: #F1F1F3;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
 
-  /* ---- Semantic Colors ---- */
-  --success: #16a34a;
-  --success-light: #22c55e;
-  --success-bg: rgba(22, 163, 74, 0.08);
-  --success-bg-strong: rgba(22, 163, 74, 0.12);
+  /* ---- Typography Colors ---- */
+  --text-primary: #171C23;
+  --text-secondary: #A7AFBA;
+  --text-tertiary: #C0C5CD;
 
-  --danger: #dc2626;
-  --danger-light: #ef4444;
-  --danger-bg: rgba(220, 38, 38, 0.08);
-  --danger-bg-strong: rgba(220, 38, 38, 0.12);
+  /* ---- Borders & Separators ---- */
+  --border: #E7E8EB;
+  --border-light: #F1F1F3;
+  --divider: #E7E8EB;
 
-  --warning: #ea580c;
-  --warning-light: #f97316;
-  --warning-bg: rgba(234, 88, 12, 0.08);
+  /* ---- Actions & Contrasts ---- */
+  --action-bg: #111820;
+  --action-bg-hover: #1E2630;
+  --action-text: #FFFFFF;
 
-  /* ---- Neutral Palette ---- */
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
+  /* ---- Security State Colors ---- */
+  --status-armed: #DCEFE1;
+  --status-armed-text: #166534;
+  --status-alarm: #FBE5E5;
+  --status-alarm-text: #991B1B;
+  --status-pending: #F5EBD5;
+  --status-pending-text: #854D0E;
+  --status-disarmed: #F1F1F3;
+  --status-disarmed-text: #475569;
 
-  /* ---- Surface & Layout ---- */
-  --background: #f8fafc;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --divider: #f1f5f9;
+  /* Legacy aliases for compatibility */
+  --primary: #111820;
+  --primary-light: #1E2630;
+  --primary-dark: #000000;
+  --primary-bg: #F1F1F3;
+  --primary-bg-strong: #E7E8EB;
+  --success: #16A34A;
+  --success-bg: #DCEFE1;
+  --danger: #DC2626;
+  --danger-bg: #FBE5E5;
+  --warning: #EA580C;
+  --warning-bg: #F5EBD5;
 
-  /* ---- Shadows ---- */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-  --shadow-sheet: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  /* ---- Grayscale Palette ---- */
+  --gray-50: #FAFAFA;
+  --gray-100: #F1F1F3;
+  --gray-200: #E7E8EB;
+  --gray-300: #D8DBE0;
+  --gray-400: #C0C5CD;
+  --gray-500: #A7AFBA;
+  --gray-600: #6B7280;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111820;
 
-  /* ---- Border Radius ---- */
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
+  /* ---- Border Radius Tokens ---- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-control: 14px;
+  --radius-card: 22px;
+  --radius-pill: 999px;
   --radius-full: 9999px;
 
-  /* ---- Spacing ---- */
+  /* Legacy radius tokens */
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 26px;
+
+  /* ---- Geometry & Spacing ---- */
+  --screen-inset: 20px;
+  --card-padding: 16px;
+  --section-gap: 16px;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -75,19 +86,19 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
-  --space-12: 48px;
 
-  /* ---- Typography ---- */
+  /* ---- Typography Scale ---- */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', monospace;
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
 
   --font-normal: 400;
   --font-medium: 500;
@@ -95,8 +106,20 @@
   --font-bold: 700;
 
   --leading-tight: 1.2;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.625;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.6;
+
+  /* ---- Minimal Shadows & Subtle Borders ---- */
+  --shadow-subtle: 0 2px 12px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Legacy shadow tokens */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.08);
 
   /* ---- Transitions ---- */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -105,11 +128,12 @@
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --duration-slow: 350ms;
-  --duration-sheet: 380ms;
+  --duration-sheet: 350ms;
 
-  /* ---- Z-index ---- */
+  /* ---- Z-index Stack ---- */
   --z-base: 0;
   --z-raised: 10;
+  --z-nav: 50;
   --z-overlay: 100;
   --z-sheet: 200;
   --z-toast: 300;
@@ -117,11 +141,9 @@
   /* ---- Safe Areas ---- */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
 
-  /* ---- State Colors (dynamic, changed by JS) ---- */
-  --state-color: var(--danger);
-  --state-bg: var(--danger-bg);
-  --state-bg-strong: var(--danger-bg-strong);
+  /* ---- Dynamic Security State Colors ---- */
+  --state-color: var(--action-bg);
+  --state-bg: var(--app-bg);
+  --state-bg-strong: var(--border);
 }

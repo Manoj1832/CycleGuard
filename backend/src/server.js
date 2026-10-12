@@ -17,6 +17,7 @@ const healthRoutes = require('./routes/health');
 const deviceRoutes = require('./routes/device');
 const securityRoutes = require('./routes/security');
 const authRoutes = require('./routes/auth');
+const journalRoutes = require('./routes/journal');
 
 // ---- Express App ----
 const app = express();
@@ -73,6 +74,7 @@ app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/device', deviceRoutes);
 app.use('/api/device', securityRoutes);
+app.use('/api/device', journalRoutes);
 
 // ---- Serve Frontend Static Files ----
 const path = require('path');
@@ -103,6 +105,10 @@ initWebSocket(server);
 
 // ---- Connect MQTT ----
 connectMqtt();
+
+// ---- Load Mock Data / Timetable Fixtures ----
+const mockDataLoader = require('./mockDataLoader');
+mockDataLoader.loadFixtures();
 
 // ---- Start Server ----
 const PORT = config.port;

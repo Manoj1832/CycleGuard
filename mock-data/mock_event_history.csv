@@ -1,0 +1,6 @@
+event_id,device_id,occurred_at,type,source,origin,message
+demo-evt-001,001,2026-10-12T08:05:00Z,DEVICE_CONNECTED,mock,demo,Demo device connected
+demo-evt-002,001,2026-10-12T08:10:00Z,DEVICE_ARMED,mock,demo,Demo security mode enabled
+demo-evt-003,001,2026-10-12T12:42:00Z,MOVEMENT_DETECTED,mock,demo,Demo movement detected
+demo-evt-004,001,2026-10-12T12:42:02Z,ALARM_ACTIVATED,mock,demo,Demo alarm activated
+demo-evt-005,001,2026-10-12T13:05:00Z,DEVICE_DISARMED,mock,demo,Demo security mode disabled

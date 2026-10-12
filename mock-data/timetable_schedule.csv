@@ -1,0 +1,16 @@
+day_of_week,start_time,end_time,activity,location,source
+Monday,08:30,10:00,Computer Networks,PSG College of Technology,mock
+Monday,10:15,12:00,Operating Systems,PSG College of Technology,mock
+Monday,13:00,15:00,Project Lab,PSG College of Technology,mock
+Tuesday,09:00,10:30,Database Systems,PSG College of Technology,mock
+Tuesday,10:45,12:15,Software Engineering,PSG College of Technology,mock
+Tuesday,13:30,15:30,Project Work,PSG College of Technology,mock
+Wednesday,08:30,10:00,Computer Networks,PSG College of Technology,mock
+Wednesday,10:15,12:00,Elective,PSG College of Technology,mock
+Wednesday,14:00,16:00,Project Lab,PSG College of Technology,mock
+Thursday,09:00,10:30,Database Systems,PSG College of Technology,mock
+Thursday,11:00,12:30,Technical Seminar,PSG College of Technology,mock
+Thursday,13:30,15:30,Project Work,PSG College of Technology,mock
+Friday,08:30,10:00,Software Engineering,PSG College of Technology,mock
+Friday,10:15,12:00,Elective,PSG College of Technology,mock
+Friday,13:00,15:00,Project Review,PSG College of Technology,mock

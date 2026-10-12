@@ -1,0 +1,4 @@
+routine_key,usual_time,description,source
+leave_for_campus,08:00,Usual departure window for campus, mock
+expected_return,16:30,Usual return window, mock
+security_check,07:55,Optional reminder to check bicycle security before leaving, mock

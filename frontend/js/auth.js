@@ -56,6 +56,7 @@ function cacheDOMElements() {
     pin: {
       title: document.getElementById('pin-title'),
       subtitle: document.getElementById('pin-subtitle'),
+      hiddenInput: document.getElementById('pin-hidden-input'),
       dotsContainer: document.getElementById('pin-dots'),
       dots: document.querySelectorAll('.pin-dot'),
       errorText: document.getElementById('pin-error'),
@@ -107,9 +108,45 @@ function bindEvents() {
     els.lockout.cancelBtn.addEventListener('click', closeAuthSheet);
   }
 
+  // Accessible Hidden Input events
+  if (els.pin.hiddenInput) {
+    els.pin.hiddenInput.addEventListener('input', (e) => {
+      if (isVerifying || getState().authFlowState === 'LOCKED_OUT') return;
+      const cleanVal = e.target.value.replace(/\D/g, '').slice(0, 4);
+      e.target.value = cleanVal;
+      pinDigits = cleanVal.split('');
+      updatePinDots();
+      hidePinError();
+
+      if (pinDigits.length === 4) {
+        setTimeout(submitPin, CONFIG.PIN_VERIFY_DELAY);
+      }
+    });
+
+    els.pin.hiddenInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && pinDigits.length === 4) {
+        e.preventDefault();
+        submitPin();
+      }
+    });
+  }
+
+  // Tapping dots focuses hidden input
+  if (els.pin.dotsContainer) {
+    els.pin.dotsContainer.addEventListener('click', () => {
+      if (els.pin.hiddenInput) {
+        els.pin.hiddenInput.focus();
+      }
+    });
+  }
+
   // Keypad keys
-  document.querySelectorAll('.keypad__key').forEach((key) => {
-    key.addEventListener('click', () => handlePinKeypadPress(key.dataset.key));
+  document.querySelectorAll('.keypad__key, .keypad-btn').forEach((key) => {
+    key.addEventListener('click', (e) => {
+      e.preventDefault();
+      const val = key.dataset.key || key.getAttribute('data-key');
+      if (val) handlePinKeypadPress(val);
+    });
   });
 
   // Physical keyboard support
@@ -182,19 +219,21 @@ export async function openAuthSheet(action) {
   }
 
   // Determine starting view: WebAuthn or PIN
-  const bioAvailable = WebAuthn.isWebAuthnSupported() || CONFIG.AUTH_MOCK_MODE;
+  // If no passkeys are enrolled, immediately show PIN view without lag
+  const state = getState();
+  const bioAvailable = (WebAuthn.isWebAuthnSupported() || CONFIG.AUTH_MOCK_MODE) && state.hasPasskeys;
 
   if (bioAvailable) {
     switchView('BIOMETRIC_PENDING');
     // Attempt biometric prompt automatically after a short delay for smooth sheet slide-up
     setTimeout(() => {
-      const state = getState();
-      if (state.authSheetOpen && state.authFlowState === 'BIOMETRIC_PENDING') {
+      const s = getState();
+      if (s.authSheetOpen && s.authFlowState === 'BIOMETRIC_PENDING') {
         triggerBiometricVerification();
       }
     }, 350);
   } else {
-    switchView('BIOMETRIC_UNAVAILABLE');
+    switchView('PIN_REQUIRED');
   }
 }
 
@@ -204,12 +243,21 @@ export async function openAuthSheet(action) {
 export function closeAuthSheet() {
   if (isVerifying) return;
 
+  // Defocus active element inside sheet to prevent aria-hidden descendant focus warning
+  if (document.activeElement && els.sheet && els.sheet.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+
   els.backdrop?.classList.remove('sheet-backdrop--visible');
   els.sheet?.classList.remove('pin-sheet--open');
+  els.sheet?.classList.remove('auth-sheet--open');
   els.sheet?.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
 
   pinDigits = [];
+  if (els.pin.hiddenInput) {
+    els.pin.hiddenInput.value = '';
+  }
   updatePinDots();
   hidePinError();
 
@@ -277,6 +325,12 @@ export function switchView(flowState, message = '') {
     case 'PIN_FAILED':
       renderPinView();
       if (els.views.pin) els.views.pin.style.display = 'block';
+      setTimeout(() => {
+        if (els.pin.hiddenInput) {
+          els.pin.hiddenInput.value = pinDigits.join('');
+          els.pin.hiddenInput.focus();
+        }
+      }, 50);
       break;
 
     case 'LOCKED_OUT':
@@ -429,6 +483,9 @@ function handlePinKeypadPress(key) {
   if (key >= '0' && key <= '9') {
     if (pinDigits.length < 4) {
       pinDigits.push(key);
+      if (els.pin.hiddenInput) {
+        els.pin.hiddenInput.value = pinDigits.join('');
+      }
       updatePinDots();
       hidePinError();
 
@@ -439,6 +496,9 @@ function handlePinKeypadPress(key) {
   } else if (key === 'backspace') {
     if (pinDigits.length > 0) {
       pinDigits.pop();
+      if (els.pin.hiddenInput) {
+        els.pin.hiddenInput.value = pinDigits.join('');
+      }
       updatePinDots();
       hidePinError();
     }
@@ -450,19 +510,30 @@ function handlePinKeypadPress(key) {
  */
 function handleKeyboardInput(e) {
   const state = getState();
-  if (!state.authSheetOpen) return;
+  const pinView = document.getElementById('auth-view-pin');
+  const isPinVisible = pinView && pinView.style.display !== 'none';
+  if (!state.authSheetOpen || !isPinVisible) return;
 
   if (e.key === 'Escape') {
     closeAuthSheet();
     return;
   }
 
-  if (state.authFlowState === 'PIN_REQUIRED' || state.authFlowState === 'PIN_FAILED') {
-    if (e.key >= '0' && e.key <= '9') {
-      handlePinKeypadPress(e.key);
-    } else if (e.key === 'Backspace') {
-      handlePinKeypadPress('backspace');
-    }
+  // If hiddenInput is focused, the input event already handles digits and backspace
+  if (document.activeElement === els.pin.hiddenInput) {
+    return;
+  }
+
+  // Main digits or Numpad digits
+  if ((e.key >= '0' && e.key <= '9') || (e.code && e.code.startsWith('Numpad') && e.key.length === 1 && e.key >= '0' && e.key <= '9')) {
+    e.preventDefault();
+    handlePinKeypadPress(e.key);
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    handlePinKeypadPress('backspace');
+  } else if (e.key === 'Enter' && pinDigits.length === 4) {
+    e.preventDefault();
+    submitPin();
   }
 }
 
@@ -516,12 +587,16 @@ function onPinFailed(err) {
     els.pin.dotsContainer?.classList.remove('pin-dots--shake');
     els.pin.dots?.forEach((dot) => dot.classList.remove('pin-dot--error'));
     pinDigits = [];
+    if (els.pin.hiddenInput) {
+      els.pin.hiddenInput.value = '';
+      els.pin.hiddenInput.focus();
+    }
     updatePinDots();
 
     if (isLockedOut) {
       startLockoutCountdown(remainingSeconds);
     } else {
-      showPinError(err.error || err.message || 'Incorrect PIN.');
+      showPinError(err.error || err.message || 'Incorrect PIN.', attemptsRemaining);
       updateAttemptsDisplay(attemptsRemaining);
     }
   }, 600);
@@ -542,9 +617,30 @@ function updatePinDots() {
 }
 
 /**
- * Show error message below PIN dots.
+ * Show error message below PIN dots with prominent report banner.
  */
-function showPinError(msg) {
+function showPinError(msg, attempts = null) {
+  const banner = document.getElementById('pin-report-banner');
+  const title = document.getElementById('pin-report-title');
+  const desc = document.getElementById('pin-report-desc');
+  const attemptsEl = document.getElementById('pin-report-attempts');
+
+  const count = attempts !== null ? attempts : getState().authAttemptsRemaining;
+
+  if (banner) {
+    banner.style.display = 'flex';
+    if (title) title.textContent = 'Incorrect PIN entered';
+    if (desc) desc.textContent = msg || 'Please verify your 4-digit code.';
+    if (attemptsEl) {
+      if (count > 0 && count < 5) {
+        attemptsEl.textContent = `${count} attempt${count === 1 ? '' : 's'} remaining before temporary lockout.`;
+        attemptsEl.style.display = 'block';
+      } else {
+        attemptsEl.style.display = 'none';
+      }
+    }
+  }
+
   if (els.pin.errorText) {
     els.pin.errorText.textContent = msg;
     els.pin.errorText.classList.add('pin-error--visible');
@@ -555,8 +651,13 @@ function showPinError(msg) {
  * Hide error message below PIN dots.
  */
 function hidePinError() {
+  const banner = document.getElementById('pin-report-banner');
+  if (banner) banner.style.display = 'none';
   if (els.pin.errorText) {
     els.pin.errorText.classList.remove('pin-error--visible');
+  }
+  if (els.pin.attemptsText) {
+    els.pin.attemptsText.style.display = 'none';
   }
 }
 
@@ -564,12 +665,13 @@ function hidePinError() {
  * Update remaining attempts display.
  */
 function updateAttemptsDisplay(attempts = null) {
-  if (!els.pin.attemptsText) return;
   const count = attempts !== null ? attempts : getState().authAttemptsRemaining;
-  if (count < 5 && count > 0) {
-    els.pin.attemptsText.textContent = `${count} attempt${count === 1 ? '' : 's'} remaining`;
-    els.pin.attemptsText.style.display = 'block';
-  } else {
+  const attemptsEl = document.getElementById('pin-report-attempts');
+  if (attemptsEl && count > 0 && count < 5) {
+    attemptsEl.textContent = `${count} attempt${count === 1 ? '' : 's'} remaining before temporary lockout.`;
+    attemptsEl.style.display = 'block';
+  }
+  if (els.pin.attemptsText) {
     els.pin.attemptsText.style.display = 'none';
   }
 }
@@ -677,7 +779,7 @@ async function executeSecurityCommand(action, authToken) {
         isActionPending: false,
         pendingStatusMessage: null,
       });
-      showTemporaryToast('Device did not respond. Verify connection.');
+      showTemporaryToast('Device did not respond. Check connection.', true);
     }
   }, CONFIG.COMMAND_TIMEOUT_MS);
 
@@ -704,7 +806,7 @@ async function executeSecurityCommand(action, authToken) {
       isActionPending: false,
       pendingStatusMessage: null,
     });
-    showTemporaryToast(`Failed: ${err.message}`);
+    showTemporaryToast(`Failed: ${err.message}`, true);
   }
 }
 
@@ -741,9 +843,9 @@ function onDeviceStateChanged(newState, prevState) {
 }
 
 /**
- * Simple toast notification.
+ * Toast notification with SVG icons and danger variant support.
  */
-function showTemporaryToast(message) {
+export function showTemporaryToast(message, isError = false) {
   let toast = document.getElementById('app-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -751,11 +853,28 @@ function showTemporaryToast(message) {
     toast.className = 'app-toast';
     document.body.appendChild(toast);
   }
-  toast.textContent = message;
+
+  const iconSvg = isError
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+
+  toast.innerHTML = `
+    <div class="app-toast__inner ${isError ? 'app-toast--danger' : ''}">
+      ${iconSvg}
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
   toast.classList.add('app-toast--visible');
   setTimeout(() => {
     toast.classList.remove('app-toast--visible');
-  }, 3500);
+  }, 4000);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // ==============================================================

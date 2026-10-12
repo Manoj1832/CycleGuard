@@ -59,7 +59,7 @@ function publishStatus() {
 function publishMovementAlert() {
   client.publish(topicAlert, 'VIBRATION_DETECTED', { qos: 1 }, (err) => {
     if (err) console.error('[Simulator] Alert publish error:', err.message);
-    else console.log('[Simulator] 🚨 Alert published -> VIBRATION_DETECTED');
+    else console.log('[Simulator] [ALERT] Alert published -> VIBRATION_DETECTED');
   });
 }
 
@@ -94,12 +94,12 @@ client.on('message', (topic, message) => {
     if (command === 'ARM') {
       securityState = 'ON';
       alarmActive = false;
-      console.log('[Simulator] 🔒 Security ARMED! Acknowledging status...');
+      console.log('[Simulator] [ARMED] Security ARMED! Acknowledging status...');
       publishStatus();
     } else if (command === 'DISARM') {
       securityState = 'OFF';
       alarmActive = false;
-      console.log('[Simulator] 🔓 Security DISARMED! Acknowledging status...');
+      console.log('[Simulator] [DISARMED] Security DISARMED! Acknowledging status...');
       publishStatus();
     }
   } catch (err) {
@@ -113,7 +113,7 @@ process.stdin.on('data', (input) => {
   const key = input.trim().toLowerCase();
   if (key === 'm') {
     if (securityState === 'ON') {
-      console.log('[Simulator] ⚡ Vibration detected while armed! Triggering ALARM...');
+      console.log('[Simulator] [VIBRATION] Vibration detected while armed! Triggering ALARM...');
       alarmActive = true;
       securityState = 'ALARM';
       publishMovementAlert();

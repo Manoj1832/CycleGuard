@@ -139,3 +139,42 @@ export function clearAlarm(deviceId = CONFIG.DEVICE_ID, credentials = {}) {
   const payload = normalizeAuth(credentials);
   return request('POST', `/api/device/${deviceId}/alarm/clear`, payload);
 }
+
+// ---- Journal & Events API ----
+
+/**
+ * Get event history with filters.
+ */
+export function getEvents(deviceId = CONFIG.DEVICE_ID, params = {}) {
+  const query = new URLSearchParams();
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  if (params.type) query.set('type', params.type);
+  if (params.source) query.set('source', params.source);
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.offset) query.set('offset', String(params.offset));
+  const qs = query.toString();
+  return request('GET', `/api/device/${deviceId}/events${qs ? '?' + qs : ''}`);
+}
+
+/**
+ * Get journal summary for a date.
+ */
+export function getJournalSummary(deviceId = CONFIG.DEVICE_ID, date = null) {
+  const qs = date ? `?date=${date}` : '';
+  return request('GET', `/api/device/${deviceId}/journal/summary${qs}`);
+}
+
+/**
+ * Confirm bicycle parking (user-confirmed ground truth).
+ */
+export function confirmParking(deviceId = CONFIG.DEVICE_ID) {
+  return request('POST', `/api/device/${deviceId}/journal/confirm-parking`);
+}
+
+/**
+ * Get ML-powered security coach recommendations.
+ */
+export function getSecurityCoach(deviceId = CONFIG.DEVICE_ID) {
+  return request('GET', `/api/device/${deviceId}/security-coach`);
+}

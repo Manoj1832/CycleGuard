@@ -77,7 +77,7 @@ async function sendAlarmNotification(deviceId, alertData = {}) {
 
   const message = {
     notification: {
-      title: '⚠️ CycleGuard Alert!',
+      title: 'CycleGuard Alert!',
       body: 'Suspicious movement detected on your bicycle!',
     },
     data: {
@@ -100,7 +100,7 @@ async function sendAlarmNotification(deviceId, alertData = {}) {
       payload: {
         aps: {
           alert: {
-            title: '⚠️ CycleGuard Alert!',
+            title: 'CycleGuard Alert!',
             body: 'Suspicious movement detected on your bicycle!',
           },
           sound: 'default',

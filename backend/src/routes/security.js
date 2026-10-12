@@ -12,6 +12,7 @@ const { publishCommand, isMqttConnected } = require('../mqtt');
 const stateManager = require('../stateManager');
 const auth = require('../auth');
 const config = require('../config');
+const eventService = require('../eventService');
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ router.post('/:deviceId/arm', (req, res) => {
     console.warn(`[Security] Failed to arm device ${deviceId}: MQTT broker disconnected.`);
     return res.status(503).json({
       success: false,
-      error: 'Device link unavailable. MQTT broker is offline.',
+      error: 'Device link unavailable. Cloud link is offline.',
     });
   }
 
@@ -100,6 +101,16 @@ router.post('/:deviceId/arm', (req, res) => {
 
   // Finding F1: Set pending command awaiting real confirmation from ESP32
   stateManager.setPending(deviceId, 'ARM', 8000);
+
+  // Record ARM_REQUESTED event
+  eventService.recordEvent({
+    deviceId,
+    type: 'ARM_REQUESTED',
+    source: 'real',
+    origin: 'web',
+    message: 'ARM command dispatched to device',
+    details: { clientIp: req.ip },
+  });
 
   // In local development mode without physical hardware, allow auto-confirm if enabled
   if (config.nodeEnv !== 'production' && process.env.AUTO_CONFIRM_DEV === 'true') {
@@ -132,7 +143,7 @@ router.post('/:deviceId/disarm', (req, res) => {
     console.warn(`[Security] Failed to disarm device ${deviceId}: MQTT broker disconnected.`);
     return res.status(503).json({
       success: false,
-      error: 'Device link unavailable. MQTT broker is offline.',
+      error: 'Device link unavailable. Cloud link is offline.',
     });
   }
 
@@ -147,6 +158,16 @@ router.post('/:deviceId/disarm', (req, res) => {
 
   // Finding F1: Set pending command awaiting real confirmation from ESP32
   stateManager.setPending(deviceId, 'DISARM', 8000);
+
+  // Record DISARM_REQUESTED event
+  eventService.recordEvent({
+    deviceId,
+    type: 'DISARM_REQUESTED',
+    source: 'real',
+    origin: 'web',
+    message: 'DISARM command dispatched to device',
+    details: { clientIp: req.ip },
+  });
 
   if (config.nodeEnv !== 'production' && process.env.AUTO_CONFIRM_DEV === 'true') {
     stateManager.disarmDevice(deviceId);
@@ -177,7 +198,7 @@ router.post('/:deviceId/alarm/clear', (req, res) => {
   if (!isMqttConnected()) {
     return res.status(503).json({
       success: false,
-      error: 'Device link unavailable. MQTT broker is offline.',
+      error: 'Device link unavailable. Cloud link is offline.',
     });
   }
 

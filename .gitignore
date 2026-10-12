@@ -28,7 +28,10 @@ build/
 coverage/
 
 #python
-__pycache__
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 
 # Persistent storage files
 backend/data/

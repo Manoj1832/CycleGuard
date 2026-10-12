@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="40" height="40">
+  <defs>
+    <clipPath id="avatar-clip">
+      <circle cx="40" cy="40" r="40"/>
+    </clipPath>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD180"/>
+      <stop offset="100%" stop-color="#FF9100"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#avatar-clip)">
+    <!-- Background circle -->
+    <rect width="80" height="80" fill="url(#bg-grad)"/>
+    <!-- Body / Jacket -->
+    <path d="M16 80 C16 62 26 54 40 54 C54 54 64 62 64 80 Z" fill="#E65100"/>
+    <!-- Collar / Shirt -->
+    <polygon points="40,56 34,70 46,70" fill="#FFFFFF"/>
+    <!-- Neck -->
+    <rect x="35" y="44" width="10" height="12" fill="#FFCC80" rx="4"/>
+    <!-- Head -->
+    <ellipse cx="40" cy="34" rx="16" ry="17" fill="#FFCC80"/>
+    <!-- Cheeks blush -->
+    <circle cx="29" cy="38" r="3" fill="#FFAB91" opacity="0.6"/>
+    <circle cx="51" cy="38" r="3" fill="#FFAB91" opacity="0.6"/>
+    <!-- Hair back -->
+    <path d="M22 34 C20 18 30 12 40 12 C52 12 60 18 58 34 C58 26 52 16 40 16 C28 16 23 26 22 34 Z" fill="#4E342E"/>
+    <!-- Hair fringe/top style -->
+    <path d="M23 28 C28 14 42 12 57 22 C52 20 44 20 38 24 C34 26 30 30 23 28 Z" fill="#5D4037"/>
+    <!-- Eyes -->
+    <circle cx="33" cy="33" r="2.5" fill="#2E1C14"/>
+    <circle cx="47" cy="33" r="2.5" fill="#2E1C14"/>
+    <circle cx="34" cy="32" r="0.8" fill="#FFFFFF"/>
+    <circle cx="48" cy="32" r="0.8" fill="#FFFFFF"/>
+    <!-- Smile -->
+    <path d="M35 40 Q40 44 45 40" fill="none" stroke="#D84315" stroke-width="2" stroke-linecap="round"/>
+    <!-- Ears -->
+    <circle cx="24" cy="35" r="3.5" fill="#FFCC80"/>
+    <circle cx="56" cy="35" r="3.5" fill="#FFCC80"/>
+  </g>
+</svg>
