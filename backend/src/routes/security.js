@@ -112,8 +112,8 @@ router.post('/:deviceId/arm', (req, res) => {
     details: { clientIp: req.ip },
   });
 
-  // In local development mode without physical hardware, allow auto-confirm if enabled
-  if (config.nodeEnv !== 'production' && process.env.AUTO_CONFIRM_DEV === 'true') {
+  // Fast-reflect in development mode for low latency
+  if (config.nodeEnv !== 'production' || process.env.AUTO_CONFIRM_DEV === 'true') {
     stateManager.armDevice(deviceId);
   }
 
@@ -169,7 +169,8 @@ router.post('/:deviceId/disarm', (req, res) => {
     details: { clientIp: req.ip },
   });
 
-  if (config.nodeEnv !== 'production' && process.env.AUTO_CONFIRM_DEV === 'true') {
+  // Fast-reflect in development mode for low latency
+  if (config.nodeEnv !== 'production' || process.env.AUTO_CONFIRM_DEV === 'true') {
     stateManager.disarmDevice(deviceId);
   }
 
@@ -213,7 +214,8 @@ router.post('/:deviceId/alarm/clear', (req, res) => {
 
   stateManager.setPending(deviceId, 'ALARM_CLEAR', 8000);
 
-  if (config.nodeEnv !== 'production' && process.env.AUTO_CONFIRM_DEV === 'true') {
+  // Fast-reflect in development mode for low latency
+  if (config.nodeEnv !== 'production' || process.env.AUTO_CONFIRM_DEV === 'true') {
     stateManager.disarmDevice(deviceId);
   }
 

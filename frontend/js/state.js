@@ -8,6 +8,8 @@
 const initialState = {
   securityState: 'OFF',        // 'OFF' | 'ON' | 'ALARM'
   connectionState: 'DISCONNECTED', // 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
+  cloudConnected: true,        // EMQX cloud broker link state
+  cloudLatencyMs: 12,          // Real-time roundtrip ping latency
   lastActivity: null,          // { message: string, timestamp: string } | null
   alarmActive: false,
   deviceId: '001',

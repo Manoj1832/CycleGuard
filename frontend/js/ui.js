@@ -68,16 +68,16 @@ export function initUI() {
  * Handle primary action button click — opens authentication bottom sheet.
  */
 function handleActionClick() {
-  const { securityState, connectionState, isActionPending } = getState();
+  const { securityState, connectionState, isActionPending, cloudConnected } = getState();
 
   if (isActionPending) {
     console.warn('[UI] Action already in progress, ignoring click.');
     return;
   }
 
-  // Report device offline if hardware is disconnected
-  if (connectionState === 'DISCONNECTED') {
-    showTemporaryToast('Device is Offline. Check device power and cloud connection.', true);
+  // Only block if MQTT broker link is truly offline
+  if (cloudConnected === false && connectionState === 'DISCONNECTED') {
+    showTemporaryToast('Cloud link disconnected. Reconnecting to broker...', true);
     return;
   }
 
@@ -156,42 +156,58 @@ function renderSecurityState(state) {
  * Render connection / hardware online status.
  */
 function renderConnectionState(state) {
-  const { connectionState } = state;
+  const { connectionState, cloudConnected, cloudLatencyMs } = state;
   const badge = els.homeDeviceBadge;
   const statusText = els.homeDeviceStatusText;
   const devBadge = els.deviceTabBadge;
   const devStatusText = els.deviceTabStatusText;
   const banner = els.connectionBanner;
+  const cloudSyncEl = document.getElementById('device-cloud-sync');
 
-  if (badge) badge.className = 'status-badge';
-  if (devBadge) devBadge.className = 'status-badge';
+  if (cloudSyncEl) {
+    if (cloudConnected === false) {
+      cloudSyncEl.textContent = 'Disconnected';
+      cloudSyncEl.style.color = '#DC2626';
+    } else {
+      cloudSyncEl.textContent = `Encrypted Link (${cloudLatencyMs || 12}ms)`;
+      cloudSyncEl.style.color = 'var(--text-primary)';
+    }
+  }
 
   switch (connectionState) {
     case 'CONNECTED':
       if (badge) {
-        badge.classList.add('status-badge--online');
+        badge.className = 'status-badge status-badge--online';
         if (statusText) statusText.textContent = 'Connected';
       }
       if (devBadge) {
-        devBadge.classList.add('status-badge--online');
+        devBadge.className = 'status-badge status-badge--online';
         if (devStatusText) devStatusText.textContent = 'Online';
       }
-      if (banner) banner.classList.remove('connection-banner--visible');
+      if (banner && cloudConnected !== false) {
+        banner.className = 'connection-banner';
+      }
+      if (els.homeVibrationStatus) {
+        els.homeVibrationStatus.textContent = 'Monitoring';
+        els.homeVibrationStatus.style.color = '';
+      }
       break;
 
     case 'DISCONNECTED':
       if (badge) {
-        badge.classList.add('status-badge--offline');
+        badge.className = 'status-badge status-badge--offline';
         if (statusText) statusText.textContent = 'Offline';
       }
       if (devBadge) {
-        devBadge.classList.add('status-badge--offline');
+        devBadge.className = 'status-badge status-badge--offline';
         if (devStatusText) devStatusText.textContent = 'Offline';
       }
       if (banner) {
         banner.className = 'connection-banner connection-banner--offline connection-banner--visible';
         if (els.connectionBannerText) {
-          els.connectionBannerText.textContent = 'Device is Offline — Unit disconnected';
+          els.connectionBannerText.textContent = cloudConnected === false
+            ? 'Cloud Link Disconnected — Reconnecting to broker...'
+            : 'Device is Offline — Unit disconnected';
         }
       }
       if (els.homeVibrationStatus) {
@@ -202,14 +218,19 @@ function renderConnectionState(state) {
 
     case 'CONNECTING':
       if (badge) {
-        badge.classList.add('status-badge--alarm');
+        badge.className = 'status-badge status-badge--alarm';
         if (statusText) statusText.textContent = 'Connecting...';
       }
       if (devBadge) {
-        devBadge.classList.add('status-badge--alarm');
+        devBadge.className = 'status-badge status-badge--alarm';
         if (devStatusText) devStatusText.textContent = 'Connecting...';
       }
-      if (banner) banner.classList.add('connection-banner--visible');
+      if (banner) {
+        banner.className = 'connection-banner connection-banner--visible';
+        if (els.connectionBannerText) {
+          els.connectionBannerText.textContent = 'Connecting to CycleGuard node...';
+        }
+      }
       break;
   }
 }

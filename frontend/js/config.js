@@ -23,16 +23,16 @@ const CONFIG = {
   // ---- Device ----
   DEVICE_ID: '001',
 
-  // ---- Reconnection ----
-  WS_RECONNECT_DELAY: 3000,    // ms
-  WS_MAX_RECONNECT_DELAY: 30000, // ms
-  WS_RECONNECT_BACKOFF: 1.5,
+  // ---- Reconnection (Ultra-snappy) ----
+  WS_RECONNECT_DELAY: 400,     // ms
+  WS_MAX_RECONNECT_DELAY: 4000, // ms
+  WS_RECONNECT_BACKOFF: 1.2,
 
-  // ---- Timeouts ----
-  PIN_VERIFY_DELAY: 300,       // ms after 4th digit before verifying
-  SUCCESS_DISPLAY_TIME: 800,   // ms to show success overlay
-  STATE_TRANSITION_DELAY: 200, // ms before UI state updates
-  COMMAND_TIMEOUT_MS: 8000,    // ms to wait for device confirmation
+  // ---- Ultra-Low Latency & Fast Reflect Timeouts ----
+  PIN_VERIFY_DELAY: 20,        // ms after 4th digit (near-instant submission)
+  SUCCESS_DISPLAY_TIME: 150,   // ms to show success overlay (fast snap)
+  STATE_TRANSITION_DELAY: 0,   // ms before UI state updates (instant reflection)
+  COMMAND_TIMEOUT_MS: 4000,    // ms to wait for device confirmation
 
   // ---- Authentication & WebAuthn ----
   AUTH_MOCK_MODE: false,       // When true, uses simulated biometrics

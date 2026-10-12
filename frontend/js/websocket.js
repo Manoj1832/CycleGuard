@@ -38,10 +38,30 @@ export function connectWebSocket() {
     return;
   }
 
+let pingInterval = null;
+let lastPingTime = 0;
+
+function startPing() {
+  clearInterval(pingInterval);
+  pingInterval = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      lastPingTime = Date.now();
+      try {
+        ws.send(JSON.stringify({ type: 'ping', t: lastPingTime }));
+      } catch (_) {}
+    }
+  }, 4000);
+}
+
+function stopPing() {
+  clearInterval(pingInterval);
+  pingInterval = null;
+}
+
   ws.onopen = () => {
     console.log('[WS] Connected');
-    // Finding S7: Do not claim the *device* is connected here; the backend sends device_status right after.
     reconnectDelay = CONFIG.WS_RECONNECT_DELAY; // reset backoff
+    startPing();
   };
 
   ws.onmessage = (event) => {
@@ -55,9 +75,10 @@ export function connectWebSocket() {
 
   ws.onclose = (event) => {
     console.log('[WS] Disconnected', event.code, event.reason);
+    stopPing();
     ws = null;
     if (!intentionallyClosed) {
-      setState({ connectionState: 'DISCONNECTED' });
+      setState({ connectionState: 'DISCONNECTED', cloudConnected: false });
       scheduleReconnect();
     }
   };
@@ -159,7 +180,30 @@ function handleMessage(data) {
       });
       break;
 
+    case 'cloud_status':
+      setState({
+        cloudConnected: !!data.connected,
+      });
+      break;
+
+    case 'pong': {
+      const rtt = Date.now() - (data.t || lastPingTime);
+      const latencyMs = Math.max(1, Math.round(rtt / 2));
+      setState({ cloudLatencyMs: latencyMs });
+      break;
+    }
+
     default:
       console.warn('[WS] Unknown message type:', data.type);
   }
+}
+
+// Ultra-fast instant reconnect on tab refocus / phone wake
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+      console.log('[WS] Tab active — triggering instant reconnect');
+      connectWebSocket();
+    }
+  });
 }

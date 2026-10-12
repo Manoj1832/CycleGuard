@@ -41,6 +41,11 @@ function connectMqtt() {
     isConnected = true;
     console.log('[MQTT] Connected to broker');
 
+    try {
+      const { broadcastCloudStatus } = require('./websocket');
+      broadcastCloudStatus(true);
+    } catch (_) {}
+
     // Subscribe to device topics
     const deviceId = config.defaultDeviceId;
     const topics = [
@@ -77,6 +82,10 @@ function connectMqtt() {
   client.on('close', () => {
     isConnected = false;
     console.log('[MQTT] Connection closed');
+    try {
+      const { broadcastCloudStatus } = require('./websocket');
+      broadcastCloudStatus(false);
+    } catch (_) {}
   });
 
   client.on('reconnect', () => {
@@ -86,6 +95,10 @@ function connectMqtt() {
   client.on('offline', () => {
     isConnected = false;
     console.log('[MQTT] Offline');
+    try {
+      const { broadcastCloudStatus } = require('./websocket');
+      broadcastCloudStatus(false);
+    } catch (_) {}
   });
 
   return client;

@@ -40,6 +40,11 @@ function initWebSocket(server) {
     const ip = req.socket.remoteAddress;
     console.log(`[WS] Client connected from ${ip}`);
 
+    // Enable TCP nodelay for ultra-low latency WebSocket frames
+    if (ws._socket && typeof ws._socket.setNoDelay === 'function') {
+      ws._socket.setNoDelay(true);
+    }
+
     // Send current device state on connection
     const deviceState = stateManager.getDevice(config.defaultDeviceId);
     sendToClient(ws, {
@@ -55,6 +60,16 @@ function initWebSocket(server) {
       status: deviceState.connectionState === 'CONNECTED' ? 'ONLINE' : 'OFFLINE',
     });
 
+    // Send MQTT cloud link connectivity
+    try {
+      const { isMqttConnected } = require('./mqtt');
+      sendToClient(ws, {
+        type: 'cloud_status',
+        connected: isMqttConnected(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (_) {}
+
     sendToClient(ws, {
       type: 'alarm',
       deviceId: deviceState.deviceId,
@@ -65,6 +80,15 @@ function initWebSocket(server) {
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message);
+        // Ultra-fast ping-pong roundtrip latency calculation
+        if (data.type === 'ping') {
+          sendToClient(ws, {
+            type: 'pong',
+            t: data.t,
+            timestamp: Date.now(),
+          });
+          return;
+        }
         console.log('[WS] Received from client:', data);
       } catch (err) {
         console.error('[WS] Invalid message from client');
@@ -153,6 +177,14 @@ function broadcast(data) {
 /**
  * Get count of connected clients.
  */
+function broadcastCloudStatus(connected) {
+  broadcast({
+    type: 'cloud_status',
+    connected: !!connected,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 function getClientCount() {
   return wss ? wss.clients.size : 0;
 }
@@ -160,5 +192,6 @@ function getClientCount() {
 module.exports = {
   initWebSocket,
   broadcast,
+  broadcastCloudStatus,
   getClientCount,
 };

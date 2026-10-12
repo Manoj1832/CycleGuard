@@ -737,7 +737,14 @@ function onAuthSuccess(authToken) {
   // Slide down auth sheet immediately
   closeAuthSheet();
 
-  // Show "Authorization successful" overlay
+  // Instant parallel dispatch for ultra-low latency
+  if (actionToExecute === 'REGISTER_PASSKEY') {
+    registerPasskeyWithToken(authToken);
+  } else {
+    executeSecurityCommand(actionToExecute, authToken);
+  }
+
+  // Brief success overlay indicator
   if (els.overlay) {
     els.overlay.classList.add('success-overlay--visible');
   }
@@ -746,15 +753,6 @@ function onAuthSuccess(authToken) {
     if (els.overlay) {
       els.overlay.classList.remove('success-overlay--visible');
     }
-
-    if (actionToExecute === 'REGISTER_PASSKEY') {
-      // Passkey enrolment is not an ARM/DISARM command: use the token to register.
-      registerPasskeyWithToken(authToken);
-      return;
-    }
-
-    // Execute security command with single-use authToken
-    executeSecurityCommand(actionToExecute, authToken);
   }, CONFIG.SUCCESS_DISPLAY_TIME);
 }
 

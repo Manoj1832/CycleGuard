@@ -185,7 +185,6 @@ body {
 }
 
 .connection-banner--offline {
-  display: flex !important;
   background-color: #FEF2F2;
   color: #991B1B;
   border-bottom: 1px solid #FCA5A5;
